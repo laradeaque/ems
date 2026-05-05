@@ -1,0 +1,132 @@
+{% extends "base_dashboard.html" %}
+{% block minilinks %}
+    <a href="{% url 'dashboard' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Dashboard</a>
+    {% if request.user.role == "admin" %}
+    <a href="{% url 'grade_list' %}" class="block p-2 rounded hover:bg-gray-100">Classes</a>
+    {% endif %}
+    <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
+    {% if request.user.role == "admin" %}
+        <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
+        <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
+    {% else %}
+        <a href="{% url 'create_exam' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam</a>
+    {% endif %}
+    <a href="{% url 'subject_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Subject Marklist</a>
+    <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
+{% endblock %}
+{% block links %}
+    <a href="{% url 'dashboard' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Dashboard</a>
+    {% if request.user.role == "admin" %}
+    <a href="{% url 'grade_list' %}" class="block p-2 rounded hover:bg-gray-100">Classes</a>
+    {% endif %}
+    <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
+    {% if request.user.role == "admin" %}
+        <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
+        <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
+    {% else %}
+        <a href="{% url 'create_exam' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam</a>
+    {% endif %}
+    <a href="{% url 'subject_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Subject Marklist</a>
+    <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
+{% endblock %}
+{% block content %}
+
+<h2 class="text-lg font-semibold mb-4">Exams</h2>
+
+<!-- 🔍 FILTERS -->
+<div class="px-4 md:px-6">
+    <form method="get" class="flex flex-wrap gap-4 mb-4">
+        <!--<input type="text" name="code" placeholder=""
+            value="{{ filters.code }}"
+            class="p-2 border rounded w-40">-->
+        <select name="code" class="p-2 border rounded w-40">
+            <option value="">Exam Code</option>
+            {% for c in codes %}
+                <option value="{{ c.id }}"
+                    {% if filters.code == c.id|stringformat:"s" %}selected{% endif %}>
+                    {{ c.exam_code }}
+                </option>
+            {% endfor %}
+        </select>
+        <select name="grade" class="p-2 border rounded w-40">
+            <option value="">All Grades</option>
+            {% for g in grades %}
+                <option value="{{ g.id }}"
+                    {% if filters.grade == g.id|stringformat:"s" %}selected{% endif %}>
+                    {{ g.name }}
+                </option>
+            {% endfor %}
+        </select>
+        <input type="text" name="subject" placeholder="Subject"
+            value="{{ filters.subject }}"
+            class="p-2 border rounded w-40">
+        <button class="bg-blue-600 text-white px-4 py-2 rounded">
+            Filter
+        </button>
+    </form>
+</div>
+
+{% if grouped_exams %}
+
+    {% for code, exams in grouped_exams.items %}
+    <div class="mb-6 bg-white rounded-xl border shadow-sm">
+        <!-- 🔵 GROUP HEADER -->
+        <div class="bg-gray-100 px-4 py-2 font-semibold">
+            Exam Code: {{ code }}
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50 text-left">
+                    <tr>
+                        <th class="p-3">Grade</th>
+                        <th class="p-3">Subject</th>
+                        <th class="p-3">Date</th>
+                        <th class="p-3">Max</th>
+                        <th class="p-3">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for exam in exams %}
+                    <tr class="border-t">
+                        <td class="p-3">{{ exam.grade.name }}</td>
+                        <td class="p-3">{{ exam.subject_name }}</td>
+                        <td class="p-3">{{ exam.date_taken }}</td>
+                        <td class="p-3">{{ exam.max_score }}</td>
+                        <td class="p-3">
+                            <a href="{% url 'enter_marks' exam.id %}"
+                            class="text-blue-600 hover:underline">
+                                Edit
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endfor %}
+
+    <!-- 📄 PAGINATION -->
+    <div class="flex justify-center mt-6 space-x-2">
+
+        {% if page_obj.has_previous %}
+            <a href="?page={{ page_obj.previous_page_number }}&code={{ filters.code }}&grade={{ filters.grade }}&subject={{ filters.subject }}"
+               class="px-3 py-1 border text-blue-600 rounded">Prev</a>
+        {% endif %}
+
+        <span class="px-3 py-1">
+            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+        </span>
+
+        {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}&code={{ filters.code }}&grade={{ filters.grade }}&subject={{ filters.subject }}"
+               class="px-3 py-1 border text-blue-600 rounded">Next</a>
+        {% endif %}
+
+    </div>
+
+{% else %}
+<p class="text-gray-500">No exams found.</p>
+{% endif %}
+
+{% endblock %}

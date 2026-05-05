@@ -1,0 +1,120 @@
+{% extends "base_dashboard.html" %}
+{% block extraheaders %}
+{% load static %}
+<script src="{% static 'js/chart.js' %}"></script>
+<!-- <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> -->
+{% endblock %}
+{% block links %}
+    <a href="{% url 'dashboard' %}" class="block p-2 rounded hover:bg-gray-100">Dashboard</a>
+    {% if request.user.role == "admin" %}
+    <a href="{% url 'grade_list' %}" class="block p-2 rounded hover:bg-gray-100">Classes</a>
+    {% endif %}
+    <a href="{% url 'learners_list' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Learners</a>
+    {% if request.user.role == "admin" %}
+    <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
+    {% endif %}
+    {% if request.user.role == "admin" %}
+        <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
+    {% else %}
+        <a href="{% url 'create_exam' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam</a>
+    {% endif %}
+    <a href="{% url 'subject_marklist' %}" class="block p-2  rounded hover:bg-gray-100">Subject Marklist</a>
+    <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
+{% endblock %}
+
+{% block minilinks %}
+    <a href="{% url 'dashboard' %}" class="block p-2 rounded hover:bg-gray-100">Dashboard</a>
+    {% if request.user.role == "admin" %}
+    <a href="{% url 'grade_list' %}" class="block p-2 rounded hover:bg-gray-100">Classes</a>
+    {% endif %}
+    <a href="{% url 'learners_list' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Learners</a>
+    {% if request.user.role == "admin" %}
+    <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
+    {% endif %}
+    {% if request.user.role == "admin" %}
+        <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
+    {% else %}
+        <a href="{% url 'create_exam' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam</a>
+    {% endif %}
+    <a href="{% url 'subject_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Subject Marklist</a>
+    <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
+{% endblock %}
+{% block content %}
+
+<div class="max-w-5xl mx-auto bg-white p-6 rounded-lg shadow">
+
+    <h2 class="text-2xl font-semibold mb-2">
+        {{ learner.name }} Performance
+    </h2>
+
+    <p class="text-gray-500 mb-6">
+        Admission: {{ learner.admission_number }} |
+        Grade: {{ learner.grade.name }}
+    </p>
+
+    <!-- Chart -->
+    <div class="mb-8">
+        <canvas id="progressChart"></canvas>
+    </div>
+
+    <!-- Table -->
+    <div class="overflow-x-auto">
+        <table class="w-full border border-gray-200 text-sm">
+            <thead class="bg-gray-100">
+                <tr>
+                    <th class="p-2 text-left">Exam</th>
+                    <th class="p-2 text-left">Average</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in progress_data %}
+                <tr class="border-t">
+                    <td class="p-2">{{ item.exam_code }}</td>
+                    <td class="p-2">{{ item.average }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+<script>
+const data = {{ progress_data|safe }};
+
+const labels = data.map(i => i.exam_code);
+const scores = data.map(i => i.average);
+
+new Chart(document.getElementById('progressChart'), {
+    type: 'line',
+    data: {
+        labels: labels,
+        datasets: [{
+            label: 'Average Score',
+            data: scores,
+            borderColor: '#16a34a',
+            backgroundColor: 'rgba(22,163,74,0.2)',
+            tension: 0.3,
+            fill: true
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: {
+                labels: {
+                    color: '#374151'
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                max: 100
+            }
+        }
+    }
+});
+</script>
+
+{% endblock %}

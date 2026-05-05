@@ -1,0 +1,155 @@
+{% extends "base_dashboard.html" %}
+
+{% block links %}
+    <a href="{% url 'dashboard' %}" class="block p-2 rounded hover:bg-gray-100">Dashboard</a>
+    {% if request.user.role == "admin" %}
+        <a href="{% url 'grade_list' %}" class="block p-2 rounded hover:bg-gray-100">Classes</a>
+    {% endif %}
+    <a href="{% url 'learners_list' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Learners</a>
+    {% if request.user.role == "admin" %}
+        <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
+    {% endif %}
+    {% if request.user.role == "admin" %}
+        <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
+    {% else %}
+        <a href="{% url 'create_exam' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam</a>
+    {% endif %}
+    <a href="{% url 'subject_marklist' %}" class="block p-2  rounded hover:bg-gray-100">Subject Marklist</a>
+    <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
+{% endblock %}
+
+{% block minilinks %}
+    <a href="{% url 'dashboard' %}" class="block p-2 rounded hover:bg-gray-100">Dashboard</a>
+    {% if request.user.role == "admin" %}
+        <a href="{% url 'grade_list' %}" class="block p-2 rounded hover:bg-gray-100">Classes</a>
+    {% endif %}
+    <a href="{% url 'learners_list' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Learners</a>
+    {% if request.user.role == "admin" %}
+        <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
+    {% endif %}
+    {% if request.user.role == "admin" %}
+        <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
+    {% else %}
+        <a href="{% url 'create_exam' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam</a>
+    {% endif %}
+    <a href="{% url 'subject_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Subject Marklist</a>
+    <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
+{% endblock %}
+
+{% block content %}
+
+<div class="mt-6">
+
+    <!-- HEADER -->
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-semibold">All Learners</h2>
+
+        <div class="flex flex-wrap gap-4 mb-4">
+            {% if request.user.role == "admin" %}
+                <a href="{% url 'add_learner' %}"
+                class="bg-green-600 text-white py-2 px-4 rounded hover:bg-blue-600 transition">
+                    Add Learner
+                </a>
+            {% endif %}
+            <a href="{% url 'dashboard' %}"
+            class="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-600 transition">
+                Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- FILTER -->
+    <form method="get" class="flex flex-col md:flex-row md:items-end gap-4 mb-6">
+        {% if request.user.role == "admin" %}
+            <div>
+                <label class="block text-sm font-medium mb-1">Filter by Grade</label>
+                <select name="grade"
+                    class="p-2 border rounded focus:ring-2 focus:ring-blue-500 w-full md:w-48">
+                    <option value="">All Grades</option>
+                    {% for grade in grades %}
+                        <option value="{{ grade.id }}"
+                            {% if filters.selected_grade == grade.id|stringformat:"s" %}selected{% endif %}>
+                            {{ grade.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+        {% endif %}
+
+        <div>
+            <label class="block text-sm font-medium mb-1">Search by Name</label>
+            <input type="text"
+                   name="learner_name"
+                   value="{{ filters.learner_name }}"
+                   placeholder="Enter name"
+                   class="p-2 border rounded focus:ring-2 focus:ring-blue-500 w-full md:w-64">
+        </div>
+
+        <div>
+            <button type="submit"
+                class="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition mt-2 md:mt-0">
+                Filter
+            </button>
+        </div>
+
+    </form>
+
+    <!-- TABLE -->
+    <div class="overflow-x-auto bg-white shadow rounded-lg">
+        <table class="min-w-[600px] w-full divide-y divide-gray-200">
+
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">#</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Admission</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Grade</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
+                </tr>
+            </thead>
+
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for learner in page_obj %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4">{{ forloop.counter }}</td>
+                    <td class="px-6 py-4">{{ learner.name }}</td>
+                    <td class="px-6 py-4">{{ learner.admission_number }}</td>
+                    <td class="px-6 py-4">{{ learner.grade.name }}</td>
+                    <td class="px-6 py-4">
+                        <a href="{% url 'learner_performance' learner.id %}"
+                           class="text-blue-600 hover:underline">
+                            View
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="px-6 py-4 text-center text-gray-500">
+                        No learners found.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+
+        </table>
+        <div class="flex justify-center mt-6 space-x-2">
+            {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}&grade={{ filters.selected_grade }}&learner_name={{ filters.learner_name }}"
+                class="px-3 py-1 border text-blue-600 rounded">Prev</a>
+            {% endif %}
+
+            <span class="px-3 py-1">
+                Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+            </span>
+
+            {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}&grade={{ filters.selected_grade }}&learner_name={{ filters.learner_name }}"
+                class="px-3 py-1 border text-blue-600 rounded">Next</a>
+            {% endif %}
+
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

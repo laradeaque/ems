@@ -1,0 +1,71 @@
+{% extends "base_dashboard.html" %}
+{% load custom_tags %}
+{% block links %}
+    <a href="{% url 'dashboard' %}" class="block p-2 rounded hover:bg-gray-100">Dashboard</a>
+    <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
+    {% if request.user.role == "admin" %}
+        <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
+    {% else %}
+        <a href="{% url 'create_exam' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam</a>
+    {% endif %}
+    <a href="{% url 'subject_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Subject Marklist</a>
+    <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
+{% endblock %}
+
+{% block minilinks %}
+    <a href="{% url 'dashboard' %}" class="block p-2 rounded hover:bg-gray-100">Dashboard</a>
+    <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
+    {% if request.user.role == "admin" %}
+        <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
+    {% else %}
+        <a href="{% url 'create_exam' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam</a>
+    {% endif %}
+    <a href="{% url 'subject_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Subject Marklist</a>
+    <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto bg-white p-6 rounded-lg shadow">
+
+    <h2 class="text-xl font-semibold mb-4">Enter Marks for {{ exam.subject_name }} - {{ exam.grade.name }}</h2>
+
+    <form method="post" class="space-y-4">
+        {% csrf_token %}
+
+        <div class="overflow-x-auto">
+            <table class="w-full border-collapse border border-gray-200">
+                <thead class="bg-gray-100">
+                    <tr>
+                        <th class="border px-3 py-2 text-left">Learner</th>
+                        <th class="border px-3 py-2 text-left">Score</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for student in students %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="border px-3 py-2">{{ student.name }}</td>
+                        <td class="border px-3 py-2">
+                            <input type="number"
+                                   step="0.5"
+                                   min="0"
+                                   max="{{ exam.max_score }}"
+                                   name="score_{{ student.id }}"
+                                   value="{{ existing_marks|get_item:student.id }}"
+                                   required
+                                   class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="mt-4">
+            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">
+                Save All Marks
+            </button>
+        </div>
+    </form>
+
+</div>
+{% endblock %}

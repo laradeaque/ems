@@ -1,0 +1,98 @@
+{% extends "base_auth.html" %}
+
+{% block content %}
+<div class="w-full max-w-md bg-white p-6 md:p-8 rounded-xl shadow-sm border">
+
+    <h2 class="text-2xl font-semibold text-center mb-6">Create Account</h2>
+
+    {% if form.errors %}
+        <div class="bg-red-100 text-red-700 p-3 rounded-lg mb-4 text-sm">
+
+            {% for error in form.non_field_errors %}
+                <p>{{ error }}</p>
+            {% endfor %}
+
+            <ul class="list-disc ml-5">
+                {% for field in form %}
+                    {% for error in field.errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+    <form method="post" class="space-y-4">
+        {% csrf_token %}
+
+        <div>
+            <label class="block text-sm font-medium mb-1">Username</label>
+            {{ form.username }}
+        </div>
+
+        <!-- PASSWORD FIELD WITH TOGGLE -->
+        <div>
+            <label class="block text-sm font-medium mb-1">Password</label>
+
+            <div class="relative">
+                {{ form.password }}
+
+                <button type="button"
+                        onclick="togglePassword('id_password', this)"
+                        class="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-blue-600 font-medium">
+                    Show Password
+                </button>
+            </div>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium mb-1">Account Type</label>
+            <select name="role" id="role"
+                onchange="toggleAdminKey()"
+                class="w-full border rounded-lg px-3 py-2">
+                <option value="teacher">Teacher</option>
+                <option value="admin">Admin</option>
+            </select>
+        </div>
+
+
+        <div id="admin-key-field" class="hidden">
+            <label class="block text-sm font-medium mb-1">Admin Pass Key</label>
+            <input type="password" name="admin_key"
+                class="w-full border rounded-lg px-3 py-2">
+        </div>
+
+        <button type="submit"
+            class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition">
+            Register
+        </button>
+    </form>
+
+    <p class="text-sm text-center mt-4">
+        Already have an account?
+        <a href="{% url 'login' %}" class="text-blue-600 hover:underline">
+            Login
+        </a>
+    </p>
+</div>
+
+<script>
+function toggleAdminKey() {
+    const role = document.getElementById("role").value;
+    const field = document.getElementById("admin-key-field");
+    field.classList.toggle("hidden", role !== "admin");
+}
+
+// Toggle password visibility
+function togglePassword(id, btn) {
+    const input = document.getElementById(id);
+
+    if (input.type === "password") {
+        input.type = "text";
+        btn.innerText = "Hide Password";
+    } else {
+        input.type = "password";
+        btn.innerText = "Show Password";
+    }
+}
+</script>
+{% endblock %}

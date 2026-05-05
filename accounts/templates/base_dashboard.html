@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard</title>
+    {% load static %}
+    <link href="{% static 'css/output.css' %}" rel="stylesheet">
+    <style>
+    td {font-size:small;}
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+        @media print {
+            body.print-mode {
+                background: #fff !important;
+            }
+        }
+    </style>
+    <style>
+        @media print {
+            /* Hide UI elements */
+            aside, header, button, a {
+                display: none !important;
+            }
+
+            body {
+                margin: 0;
+                padding: 0;
+                font-size: 11px;
+            }
+
+            main {
+                padding: 5px !important;
+            }
+
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                page-break-inside: auto;
+            }
+
+            tr {
+                page-break-inside: avoid;
+                page-break-after: auto;
+            }
+
+            thead {
+                display: table-header-group; /* repeat header on each page */
+            }
+
+            tfoot {
+                display: table-footer-group; /* ❌ THIS causes duplication */
+            }
+
+            /* ✅ FIX: prevent footer repeating */
+            tfoot {
+                display: table-row-group;
+            }
+        }
+    </style>
+    {% block extraheaders %}
+    {% endblock %}
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+
+<body class="bg-gray-50">
+
+<div class="flex min-h-screen">
+
+    <!-- 🔲 MOBILE SIDEBAR -->
+    <div id="mobileMenu"
+         class="fixed inset-0 bg-black bg-opacity-40 hidden z-40 md:hidden">
+
+        <div class="w-64 bg-white h-full p-6">
+            <h2 class="text-lg font-semibold text-blue-600 mb-6">
+                HRPJS EMS
+            </h2>
+
+            <nav class="space-y-2 text-sm">
+                {% block minilinks %}
+                {% endblock %}
+            </nav>
+        </div>
+    </div>
+
+    <!-- 🖥 DESKTOP SIDEBAR -->
+    <aside class="hidden md:block w-64 bg-white border-r p-6">
+        <h2 class="text-lg font-semibold text-blue-600 mb-6">HRPJS EMS</h2>
+
+        <nav class="space-y-2 text-sm">
+            {% block links %}
+            {% endblock %}
+        </nav>
+    </aside>
+
+    <!-- MAIN -->
+    <div class="flex-1">
+
+        <!-- 🔝 TOP BAR -->
+        <header class="bg-white border-b px-4 py-3 flex justify-between items-center">
+
+            <!-- MOBILE MENU BUTTON -->
+            <button onclick="toggleMenu()" class="md:hidden text-gray-600">
+                ☰
+            </button>
+
+            <h1 class="font-semibold">Dashboard</h1>
+
+            <div class="flex items-center gap-4">
+                <span class="text-sm text-gray-500">
+                    {{ request.user.username }}
+                </span>
+
+                <!-- LOGOUT -->
+                <form method="post" action="{% url 'logout' %}">
+                    {% csrf_token %}
+                    <button class="text-sm text-red-500 hover:underline">
+                        Logout
+                    </button>
+                </form>
+            </div>
+        </header>
+
+        <!-- CONTENT -->
+        <main class="p-4 md:p-6">
+        <!-- FLASH MESSAGES -->
+            {% if messages %}
+            <div class="space-y-2 mb-4">
+                {% for message in messages %}
+                <div class="alert p-3 rounded
+                            {% if message.tags == 'error' %}bg-red-100 text-red-700{% endif %}
+                            {% if message.tags == 'success' %}bg-green-100 text-green-700{% endif %}">
+                    {{ message }}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% block content %}{% endblock %}
+        </main>
+
+    </div>
+</div>
+
+<script>
+function toggleMenu() {
+    const menu = document.getElementById("mobileMenu");
+    menu.classList.toggle("hidden");
+}
+
+document.getElementById("mobileMenu").addEventListener("click", function(e) {
+    const sidebar = this.querySelector("div"); // the actual sidebar panel
+    // If click is outside the inner panel, hide menu
+    if (!sidebar.contains(e.target)) {
+        this.classList.add("hidden");
+    }
+});
+</script>
+
+</body>
+</html>

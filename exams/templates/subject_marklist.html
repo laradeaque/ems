@@ -1,0 +1,115 @@
+{% extends "base_dashboard.html" %}
+
+{% block links %}
+    <a href="{% url 'dashboard' %}" class="block p-2 rounded hover:bg-gray-100">Dashboard</a>
+    {% if request.user.role == "admin" %}
+    <a href="{% url 'grade_list' %}" class="block p-2 rounded hover:bg-gray-100">Classes</a>
+    {% endif %}
+    <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
+    {% if request.user.role == "admin" %}
+        <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
+        <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
+    {% else %}
+        <a href="{% url 'create_exam' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam</a>
+    {% endif %}
+    <a href="{% url 'subject_marklist' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Subject Marklist</a>
+    <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
+{% endblock %}
+
+{% block minilinks %}
+    <a href="{% url 'dashboard' %}" class="block p-2 rounded hover:bg-gray-100">Dashboard</a>
+    {% if request.user.role == "admin" %}
+    <a href="{% url 'grade_list' %}" class="block p-2 rounded hover:bg-gray-100">Classes</a>
+    {% endif %}
+    <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
+    {% if request.user.role == "admin" %}
+        <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
+        <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
+    {% else %}
+        <a href="{% url 'create_exam' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam</a>
+    {% endif %}
+    <a href="{% url 'subject_marklist' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Subject Marklist</a>
+    <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+
+    <!-- Print Button -->
+    <div class="flex justify-end mb-4">
+        <button onclick="printMarklist()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">
+            Print
+        </button>
+    </div>
+
+    <h2 class="text-xl font-semibold mb-2">Subject Marklist: {{ selected_exam.subject_name }}</h2>
+    <p class="mb-2 text-sm text-gray-500">
+        Exam: {{ selected_exam.exam_code }} | Grade: {{ selected_exam.grade.name }}
+    </p>
+
+    <div class="overflow-x-auto mt-2">
+        <table class="w-full border-collapse border border-gray-200 text-sm">
+            <thead class="bg-gray-100">
+                <tr>
+                    <th class="border px-2 py-1 text-left">#</th>
+                    <th class="border px-2 py-1 text-left">Learner</th>
+                    <th class="border px-2 py-1 text-left">Score</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if results %}
+                    {% for item in results %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="border px-2 py-1">{{ forloop.counter }}</td>
+                        <td class="border px-2 py-1">{{ item.student.name }}</td>
+                        <td class="border px-2 py-1">{{ item.score }}</td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-gray-500">No results found.</p>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="mt-3 bg-gray-50 p-3 rounded shadow-sm space-y-1 text-sm">
+        <p><strong>Total Learners:</strong> {{ learners }}</p>
+        <p><strong>Total Score:</strong> {{ total_score }}</p>
+        <p><strong>Mean Score:</strong> {{ mean_score }}</p>
+    </div>
+
+    <div class="mt-4">
+        <a href="{% url 'subject_marklist' %}" class="bg-gray-200 px-4 py-2 rounded hover:bg-gray-300 transition">
+            Back
+        </a>
+    </div>
+
+</div>
+<script>
+
+function printMarklist() {
+    // Reload page when print is canceled or finished
+    window.onafterprint = () => location.reload();
+    // Add a class to body for print styling
+    document.body.classList.add('print-mode');
+
+    // Hide the sidebar, header, buttons etc.
+    const aside = document.querySelector('aside');
+    const header = document.querySelector('header');
+    const buttons = document.querySelectorAll('button, a');
+    aside?.classList.add('hidden');
+    header?.classList.add('hidden');
+    buttons.forEach(b => b.style.display = 'none');
+
+    // Shrink padding and font size
+    const main = document.querySelector('main');
+    if(main) {
+        main.style.padding = '0.5rem';
+        main.style.fontSize = '0.85rem';
+    }
+
+    // Trigger print
+    window.print();
+}
+</script>
+{% endblock %}

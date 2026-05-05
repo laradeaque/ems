@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title|default:"HRPJS EMS" }}</title>
+    {% load static %}
+    <link href="{% static 'css/output.css' %}" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+
+<body class="bg-gray-50 flex flex-col min-h-screen">
+
+    <!-- NAVBAR -->
+    <nav class="bg-white border-b shadow-sm">
+        <div class="max-w-5xl mx-auto px-4 py-4">
+            <h1 class="text-xl font-semibold text-blue-600">
+                HRPJS EMS
+            </h1>
+        </div>
+    </nav>
+
+    <!-- CONTENT -->
+    <main class="flex-1 flex items-start md:items-center justify-center px-4 py-6 md:py-10">
+    <!-- FLASH MESSAGES -->
+        {% if messages %}
+        <div class="space-y-2 mb-4">
+            {% for message in messages %}
+            <div class="alert p-3 rounded
+                        {% if message.tags == 'error' %}bg-red-100 text-red-700{% endif %}
+                        {% if message.tags == 'success' %}bg-green-100 text-green-700{% endif %}">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="text-center text-sm text-gray-500 py-4">
+        Powered by Brains
+    </footer>
+
+</body>
+</html>

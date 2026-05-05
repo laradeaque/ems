@@ -1,0 +1,90 @@
+{% extends "base_dashboard.html" %}
+
+{% block links %}
+    <a href="{% url 'dashboard' %}" class="block p-2 rounded hover:bg-gray-100">Dashboard</a>
+    <a href="{% url 'grade_list' %}" class="block p-2 rounded text-blue-600  bg-gray-100">Classes</a>
+    <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
+    <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
+    {% if request.user.role == "admin" %}
+        <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
+    {% else %}
+        <a href="{% url 'create_exam' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam</a>
+    {% endif %}
+    <a href="{% url 'subject_marklist' %}" class="block p-2  rounded hover:bg-gray-100">Subject Marklist</a>
+    <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
+{% endblock %}
+
+{% block minilinks %}
+    <a href="{% url 'dashboard' %}" class="block p-2 rounded hover:bg-gray-100">Dashboard</a>
+    <a href="{% url 'grade_list' %}" class="block p-2 rounded text-blue-600 bg-gray-100">Classes</a>
+    <a href="{% url 'learners_list' %}" class="block p-2 hover:rounded bg-gray-100">Learners</a>
+    <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
+    {% if request.user.role == "admin" %}
+        <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
+    {% else %}
+        <a href="{% url 'create_exam' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam</a>
+    {% endif %}
+    <a href="{% url 'subject_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Subject Marklist</a>
+    <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
+{% endblock %}
+
+{% block content %}
+
+<div class="flex justify-center mt-10 px-4">
+  <div class="w-full max-w-md bg-white p-8 rounded-lg shadow">
+
+    <h2 class="text-2xl font-semibold mb-6 text-center">Add Grade</h2>
+
+    <!-- FLASH MESSAGES -->
+    {% if messages %}
+      <div class="space-y-2 mb-4">
+        {% for message in messages %}
+          <div class="alert p-3 rounded
+                      {% if message.tags == 'error' %}bg-red-100 text-red-700{% endif %}
+                      {% if message.tags == 'success' %}bg-green-100 text-green-700{% endif %}">
+            {{ message }}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <form method="post" class="space-y-4">
+      {% csrf_token %}
+
+      <div>
+        <label class="block text-sm font-medium mb-1">Grade Name</label>
+        <input type="text" name="name"
+              class="w-full p-2 border rounded" required>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium mb-1">Class Teacher</label>
+        <select name="class_teacher" class="w-full p-2 border rounded">
+          <option value="">-- None --</option>
+          {% for teacher in teachers %}
+            <option value="{{ teacher.id }}">{{ teacher.username }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <button class="w-full bg-green-600 text-white py-2 rounded">
+        Create Grade
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- Auto-dismiss messages -->
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const alerts = document.querySelectorAll(".alert");
+  alerts.forEach(alert => {
+    setTimeout(() => {
+      alert.classList.add("opacity-0", "transition", "duration-500");
+      setTimeout(() => alert.remove(), 500);
+    }, 4000);
+  });
+});
+</script>
+
+{% endblock %}

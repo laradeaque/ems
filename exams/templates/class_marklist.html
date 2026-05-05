@@ -1,0 +1,151 @@
+{% extends "base_dashboard.html" %}
+{% load custom_tags %}
+{% block links %}
+    <a href="{% url 'dashboard' %}" class="block p-2 rounded hover:bg-gray-100">Dashboard</a>
+    {% if request.user.role == "admin" %}
+    <a href="{% url 'grade_list' %}" class="block p-2 rounded hover:bg-gray-100">Classes</a>
+    {% endif %}
+    <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
+    {% if request.user.role == "admin" %}
+        <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
+        <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
+    {% else %}
+        <a href="{% url 'create_exam' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam</a>
+    {% endif %}
+    <a href="{% url 'subject_marklist' %}" class="block p-2  rounded hover:bg-gray-100">Subject Marklist</a>
+    <a href="{% url 'class_marklist' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Class Marklist</a>
+{% endblock %}
+
+{% block minilinks %}
+    <a href="{% url 'dashboard' %}" class="block p-2 rounded hover:bg-gray-100">Dashboard</a>
+    {% if request.user.role == "admin" %}
+    <a href="{% url 'grade_list' %}" class="block p-2 rounded hover:bg-gray-100">Classes</a>
+    {% endif %}
+    <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
+    {% if request.user.role == "admin" %}
+        <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
+        <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
+    {% else %}
+        <a href="{% url 'create_exam' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam</a>
+    {% endif %}
+    <a href="{% url 'subject_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Subject Marklist</a>
+    <a href="{% url 'class_marklist' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Class Marklist</a>
+{% endblock %}
+{% block content %}
+<div class="overflow-x-auto mt-6">
+<!-- Print Button -->
+    <div class="flex justify-end mb-4">
+        <button onclick="printMarklist()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">
+            Print
+        </button>
+    </div>
+    <center>
+        <h2 class="text-lg font-semibold mb-4">
+            Holy Rosary Primary and Junior School
+        </h2>
+        <h2 class="text-lg font-semibold mb-4">
+            <p editable=true>{{ exam_code }} {{ selected_grade.name }}</p>
+        </h2>
+    </center>
+    <div class="overflow-x-auto">
+        <table class="min-w-full bg-white border border-gray-300">
+            <thead class="bg-gray-100">
+                <tr>
+                    <th class="px-3 py-2 border">#</th>
+                    <th class="px-3 py-2 border text-left">Student</th>
+                    {% for subject in subjects %}
+                        <th class="px-3 py-2 border">{{ subject }}</th>
+                    {% endfor %}
+                    <th class="px-3 py-2 border">Total</th>
+                    {% if show_points %}
+                        <th class="px-3 py-2 border">Average</th>
+                    {% endif %}
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for row in results %}
+                <tr class="text-center border-b">
+                    <td class="px-3 py-2">{{ forloop.counter }}</td>
+                    <td class="px-3 py-2 text-left">{{ row.student.name }}</td>
+                    {% for subject in subjects %}
+                        <td class="px-3 py-2">{{ row.scores|get_item:subject }}
+                        {% if not show_points %}
+                            ({% if row.scores|get_item:subject >= 90 %}EE1
+                            {% elif row.scores|get_item:subject >= 75 %}EE2
+                            {% elif row.scores|get_item:subject >= 58 %}ME1
+                            {% elif row.scores|get_item:subject >= 41 %}ME2
+                            {% elif row.scores|get_item:subject >= 31 %}AE1
+                            {% elif row.scores|get_item:subject >= 21 %}AE2
+                            {% elif row.scores|get_item:subject >= 11 %}BE1
+                            {% else %}BE2
+                            {% endif %})
+                        {% endif %}</td>
+                    {% endfor %}
+                    <td class="px-3 py-2 font-semibold">{{ row.total }}</td>
+                    {% if show_points %}
+                        <td class="px-3 py-2 font-semibold">
+                        {% if row.average >= 7 %}EE1
+                        {% elif row.average >= 6 %}EE2
+                        {% elif row.average >= 5 %}ME1
+                        {% elif row.average >= 4 %}ME2
+                        {% elif row.average >= 3 %}AE1
+                        {% elif row.average >= 2 %}AE2
+                        {% elif row.average >= 1 %}BE1
+                        {% else %}BE2
+                        {% endif %}</td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+
+            <tfoot class="bg-gray-50 font-semibold">
+                <tr>
+                    <td colspan="2" class="px-3 py-2 text-left">Total</td>
+                    {% for subject in subjects %}
+                        <td class="px-3 py-2 text-center">{{ subject_totals|get_item:subject }}</td>
+                    {% endfor %}
+                    <td class="px-3 py-2 text-center">{{ class_total }}</td>
+                </tr>
+
+                <tr>
+                    <td colspan="2" class="px-3 py-2 text-left">Mean</td>
+                    {% for subject in subjects %}
+                        <td class="px-3 py-2 text-center">{{ subject_means|get_item:subject }}</td>
+                    {% endfor %}
+                    <td class="px-3 py-2 text-center">{{ class_mean }}</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+<script>
+
+function printMarklist() {
+    // Reload page when print is canceled or finished
+    window.onafterprint = () => location.reload();
+    // Add a class to body for print styling
+    document.body.classList.add('print-mode');
+
+    // Hide the sidebar, header, buttons etc.
+    const aside = document.querySelector('aside');
+    const header = document.querySelector('header');
+    const buttons = document.querySelectorAll('button, a');
+    aside?.classList.add('hidden');
+    aside.style.display = "none";
+    header?.classList.add('hidden');
+    header.style.display = "none";
+    buttons.forEach(b => b.style.display = 'none');
+
+    // Shrink padding and font size
+    const main = document.querySelector('main');
+    if(main) {
+        main.style.padding = '0.5rem';
+        main.style.fontSize = '0.85rem';
+    }
+
+    // Trigger print
+    window.print();
+}
+</script>
+{% endblock %}
