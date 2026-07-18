@@ -1,0 +1,113 @@
+{% extends "base_dashboard.html" %}
+{% block links %}
+    <a href="{% url 'dashboard' %}" class="block p-2 rounded hover:bg-gray-100">Dashboard</a>
+    {% if request.user.role == "admin" %}
+    <a href="{% url 'grade_list' %}" class="block p-2 rounded hover:bg-gray-100">Classes</a>
+    {% endif %}
+    {% if request.user.role == "admin" %}
+    <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
+        <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
+        <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
+        <a href="{% url 'subject_marklist' %}" class="block p-2  rounded hover:bg-gray-100">Subject Marklist</a>
+        <a href="{% url 'class_marklist' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Class Marklist</a>
+    {% else %}
+        <a href="{% url 'create_exam' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam</a>
+    {% endif %}
+
+{% endblock %}
+
+{% block minilinks %}
+    <a href="{% url 'dashboard' %}" class="block p-2 rounded hover:bg-gray-100">Dashboard</a>
+    {% if request.user.role == "admin" %}
+    <a href="{% url 'grade_list' %}" class="block p-2 rounded hover:bg-gray-100">Classes</a>
+    <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
+    {% endif %}
+    {% if request.user.role == "admin" %}
+        <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
+        <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
+    {% else %}
+        <a href="{% url 'create_exam' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam</a>
+    {% endif %}
+    {% if request.user.role == "admin" %}
+    <a href="{% url 'subject_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Subject Marklist</a>
+    <a href="{% url 'class_marklist' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Class Marklist</a>
+    {% endif %}
+{% endblock %}
+{% block content %}
+<div class="max-w-md mx-auto mt-10 bg-white p-6 rounded shadow">
+
+    <h2 class="text-xl font-semibold mb-4">Generate Class Marklist</h2>
+
+    <form method="post" class="space-y-4">
+        {% csrf_token %}
+
+        <!-- GRADE -->
+        <div>
+            <label class="block text-sm font-medium">
+                First Class
+            </label>
+            {{ form.first_grade }}
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium">
+                Second Class
+            </label>
+            {{ form.second_grade }}
+        </div>
+        <!-- EXAM CODE -->
+        <div>
+            <label class="block text-sm font-medium">Exam Code</label>
+            <select name="exam_code" id="examCodeSelect" class="w-full border p-2 rounded">
+                <option value="">Select Exam Code</option>
+                {% for exam in exams %}
+                    <option value="{{ exam.exam_code }}">
+                        {{ exam.exam_code }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- SHOW POINTS -->
+        <div class="flex items-center gap-4">
+            <label class="text-sm">Show Points Only</label>
+            {{ form.show_points_only }}
+        </div>
+
+        <button type="submit"
+            class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">
+            Generate
+        </button>
+    </form>
+    <p class="text-sm text-center mt-5">
+        Do you need a
+        <a href="{% url 'double' %}" class="text-blue-600 hover:underline">
+            Single-class marklist
+        </a>?
+    </p>
+</div>
+
+<script>
+const gradeField = document.querySelector('[name="grade"]');
+const examCodeSelect = document.getElementById('examCodeSelect');
+
+gradeField.addEventListener('change', function () {
+    const selectedGrade = this.value;
+
+    Array.from(examCodeSelect.options).forEach(option => {
+        if (!option.value) return;
+
+        const examGrade = option.getAttribute('data-grade');
+
+        if (examGrade === selectedGrade) {
+            option.style.display = 'block';
+        } else {
+            option.style.display = 'none';
+        }
+    });
+
+    examCodeSelect.value = "";
+});
+</script>
+
+{% endblock %}

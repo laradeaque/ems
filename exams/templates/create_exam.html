@@ -2,26 +2,27 @@
 
 {% block links %}
     <a href="{% url 'dashboard' %}" class="block p-2 rounded hover:bg-gray-100">Dashboard</a>
-    <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
     {% if request.user.role == "admin" %}
+    <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
         <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
+        <a href="{% url 'subject_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Subject Marklist</a>
+        <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
     {% else %}
         <a href="{% url 'create_exam' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Create Exam</a>
     {% endif %}
-    <a href="{% url 'subject_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Subject Marklist</a>
-    <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
 {% endblock %}
 
 {% block minilinks %}
     <a href="{% url 'dashboard' %}" class="block p-2 rounded hover:bg-gray-100">Dashboard</a>
-    <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
     {% if request.user.role == "admin" %}
+    <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
         <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
     {% else %}
         <a href="{% url 'create_exam' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Create Exam</a>
     {% endif %}
-    <a href="{% url 'subject_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Subject Marklist</a>
-    <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
+    {% if request.user.role == "admin" %}    <a href="{% url 'subject_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Subject Marklist</a>
+    <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>{% endif %}
+
 {% endblock %}
 
 {% block content %}
@@ -43,14 +44,19 @@
             </div>
 
             <div>
-                <label class="block text-sm font-medium mb-1">{{ form.subject_name.label }}</label>
-                {{ form.subject_name }}
+                <label class="block text-sm font-medium mb-1">{{ form.subject.label }}</label>
+                {{ form.subject }}
             </div>
 
-            <div>
+            <!--<div>
+                <label class="block text-sm font-medium mb-1">{{ form.subject_name.label }}</label>
+                {{ form.subject_name }}
+            </div>-->
+
+            <!--<div>
                 <label class="block text-sm font-medium mb-1">{{ form.max_score.label }}</label>
                 {{ form.max_score }}
-            </div>
+            </div>-->
 
             <div>
                 <label class="block text-sm font-medium mb-1">{{ form.date_taken.label }}</label>

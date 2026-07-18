@@ -1,8 +1,9 @@
 from django.contrib import admin
-from .models import Exam, ExamCode, Mark
+from .models import Exam, ExamCode, Mark, Subject
 
 
 # Register your models here.
 admin.site.register(Exam)
 admin.site.register(ExamCode)
+admin.site.register(Subject)
 admin.site.register(Mark)

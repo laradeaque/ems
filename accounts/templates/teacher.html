@@ -3,31 +3,31 @@
     <a href="{% url 'dashboard' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Dashboard</a>
     {% if request.user.role == "admin" %}
     <a href="{% url 'grade_list' %}" class="block p-2 rounded hover:bg-gray-100">Classes</a>
-    {% endif %}
     <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
+    {% endif %}
     {% if request.user.role == "admin" %}
         <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
         <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
+        <a href="{% url 'subject_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Subject Marklist</a>
+        <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
     {% else %}
         <a href="{% url 'create_exam' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam</a>
     {% endif %}
-    <a href="{% url 'subject_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Subject Marklist</a>
-    <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
 {% endblock %}
 {% block links %}
     <a href="{% url 'dashboard' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Dashboard</a>
     {% if request.user.role == "admin" %}
     <a href="{% url 'grade_list' %}" class="block p-2 rounded hover:bg-gray-100">Classes</a>
-    {% endif %}
     <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
-    {% if request.user.role == "admin" %}
         <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
         <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
     {% else %}
         <a href="{% url 'create_exam' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam</a>
     {% endif %}
-    <a href="{% url 'subject_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Subject Marklist</a>
-    <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
+    {% if request.user.role == "admin" %}
+        <a href="{% url 'subject_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Subject Marklist</a>
+        <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
+    {% endif %}
 {% endblock %}
 {% block content %}
 
@@ -35,12 +35,12 @@
 
 <!-- 🔍 FILTERS -->
 <div class="px-4 md:px-6">
-    <form method="get" class="flex flex-wrap gap-4 mb-4">
+    <form method="get" class="flex gap-2 mb-4">
         <!--<input type="text" name="code" placeholder=""
             value="{{ filters.code }}"
             class="p-2 border rounded w-40">-->
-        <select name="code" class="p-2 border rounded w-40">
-            <option value="">Exam Code</option>
+        <select name="code" class="p-2 border rounded w-full">
+            <option value="">Code</option>
             {% for c in codes %}
                 <option value="{{ c.id }}"
                     {% if filters.code == c.id|stringformat:"s" %}selected{% endif %}>
@@ -48,7 +48,7 @@
                 </option>
             {% endfor %}
         </select>
-        <select name="grade" class="p-2 border rounded w-40">
+        <select name="grade" class="p-2 border rounded w-full">
             <option value="">All Grades</option>
             {% for g in grades %}
                 <option value="{{ g.id }}"
@@ -59,7 +59,7 @@
         </select>
         <input type="text" name="subject" placeholder="Subject"
             value="{{ filters.subject }}"
-            class="p-2 border rounded w-40">
+            class="p-2 border rounded w-full">
         <button class="bg-blue-600 text-white px-4 py-2 rounded">
             Filter
         </button>
@@ -89,7 +89,7 @@
                     {% for exam in exams %}
                     <tr class="border-t">
                         <td class="p-3">{{ exam.grade.name }}</td>
-                        <td class="p-3">{{ exam.subject_name }}</td>
+                        <td class="p-3">{{ exam.subject.code }}</td>
                         <td class="p-3">{{ exam.date_taken }}</td>
                         <td class="p-3">{{ exam.max_score }}</td>
                         <td class="p-3">
@@ -126,7 +126,7 @@
     </div>
 
 {% else %}
-<p class="text-gray-500">No exams found.</p>
+<p class="px-6 py-4 text-center text-gray-500">You haven’t recorded any exams yet. Please add one to get started.</p>
 {% endif %}
 
 {% endblock %}

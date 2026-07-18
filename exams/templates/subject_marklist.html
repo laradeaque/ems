@@ -5,15 +5,15 @@
     {% if request.user.role == "admin" %}
     <a href="{% url 'grade_list' %}" class="block p-2 rounded hover:bg-gray-100">Classes</a>
     {% endif %}
-    <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
     {% if request.user.role == "admin" %}
+    <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
         <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
         <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
+        <a href="{% url 'subject_marklist' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Subject Marklist</a>
+        <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
     {% else %}
         <a href="{% url 'create_exam' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam</a>
     {% endif %}
-    <a href="{% url 'subject_marklist' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Subject Marklist</a>
-    <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
 {% endblock %}
 
 {% block minilinks %}
@@ -21,15 +21,15 @@
     {% if request.user.role == "admin" %}
     <a href="{% url 'grade_list' %}" class="block p-2 rounded hover:bg-gray-100">Classes</a>
     {% endif %}
-    <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
     {% if request.user.role == "admin" %}
+        <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
         <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
         <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
+        <a href="{% url 'subject_marklist' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Subject Marklist</a>
+        <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
     {% else %}
         <a href="{% url 'create_exam' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam</a>
     {% endif %}
-    <a href="{% url 'subject_marklist' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Subject Marklist</a>
-    <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
 {% endblock %}
 
 {% block content %}

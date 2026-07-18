@@ -1,0 +1,81 @@
+{% extends "base_dashboard.html" %}
+
+{% block links %}
+    <a href="{% url 'dashboard' %}" class="block p-2 rounded hover:bg-gray-100">Dashboard</a>
+
+    {% if request.user.role == "admin" %}
+        <a href="{% url 'grade_list' %}" class="block p-2 rounded hover:bg-gray-100">Classes</a>
+        <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
+        <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
+        <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
+        <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
+        <a href="{% url 'get_report_forms' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Report Forms</a>
+    {% endif %}
+{% endblock %}
+
+
+{% block minilinks %}
+    <a href="{% url 'dashboard' %}" class="block p-2 rounded hover:bg-gray-100">Dashboard</a>
+
+    {% if request.user.role == "admin" %}
+        <a href="{% url 'grade_list' %}" class="block p-2 rounded hover:bg-gray-100">Classes</a>
+        <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
+        <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
+        <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
+        <a href="{% url 'get_report_forms' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Report Forms</a>
+    {% endif %}
+{% endblock %}
+
+
+{% block content %}
+
+<div class="max-w-md mx-auto mt-10 bg-white p-6 rounded-lg shadow">
+
+    <h2 class="text-xl font-semibold mb-5 text-center">
+        Generate Class Report Forms
+    </h2>
+
+    <form method="post" class="space-y-4">
+
+        {% csrf_token %}
+
+        <div>
+            <label class="block text-sm font-medium mb-1">
+                Select Class
+            </label>
+            {{ form.grade }}
+        </div>
+
+
+        <div>
+            <label class="block text-sm font-medium mb-1">
+                Opening Exam
+            </label>
+            {{ form.opener }}
+        </div>
+
+
+        <div>
+            <label class="block text-sm font-medium mb-1">
+                Mid Term Exam
+            </label>
+            {{ form.midterm }}
+        </div>
+
+
+        <div>
+            <label class="block text-sm font-medium mb-1">
+                End Term Exam
+            </label>
+            {{ form.endterm }}
+        </div>
+
+
+        <button type="submit"
+            class="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">
+            Generate Report Forms
+        </button>
+
+    </form>
+</div>
+{% endblock %}

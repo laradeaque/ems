@@ -4,32 +4,35 @@
     <a href="{% url 'dashboard' %}" class="block p-2 rounded hover:bg-gray-100">Dashboard</a>
     {% if request.user.role == "admin" %}
     <a href="{% url 'grade_list' %}" class="block p-2 rounded hover:bg-gray-100">Classes</a>
-    {% endif %}
     <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
+    {% endif %}
     {% if request.user.role == "admin" %}
         <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
         <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
     {% else %}
         <a href="{% url 'create_exam' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam</a>
     {% endif %}
-    <a href="{% url 'subject_marklist' %}" class="block p-2  rounded hover:bg-gray-100">Subject Marklist</a>
-    <a href="{% url 'class_marklist' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Class Marklist</a>
+
+    {% if request.user.role == "admin" %}
+        <a href="{% url 'subject_marklist' %}" class="block p-2  rounded hover:bg-gray-100">Subject Marklist</a>
+        <a href="{% url 'class_marklist' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Class Marklist</a>
+    {% endif %}
 {% endblock %}
 
 {% block minilinks %}
     <a href="{% url 'dashboard' %}" class="block p-2 rounded hover:bg-gray-100">Dashboard</a>
     {% if request.user.role == "admin" %}
     <a href="{% url 'grade_list' %}" class="block p-2 rounded hover:bg-gray-100">Classes</a>
-    {% endif %}
     <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
+    {% endif %}
     {% if request.user.role == "admin" %}
         <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
         <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
+        <a href="{% url 'subject_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Subject Marklist</a>
+        <a href="{% url 'class_marklist' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Class Marklist</a>
     {% else %}
         <a href="{% url 'create_exam' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam</a>
     {% endif %}
-    <a href="{% url 'subject_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Subject Marklist</a>
-    <a href="{% url 'class_marklist' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Class Marklist</a>
 {% endblock %}
 {% block content %}
 <div class="overflow-x-auto mt-6">
@@ -44,7 +47,11 @@
             Holy Rosary Primary and Junior School
         </h2>
         <h2 class="text-lg font-semibold mb-4">
-            <p editable=true>{{ exam_code }} {{ selected_grade.name }}</p>
+            {% if double %}
+                <p editable=true>{{ exam_code }} {{ selected_grade }}</p>
+            {% else %}
+                <p editable=true>{{ exam_code }} {{ selected_grade.name }}</p>
+            {% endif %}
         </h2>
     </center>
     <div class="overflow-x-auto">
@@ -120,31 +127,129 @@
     </div>
 </div>
 <script>
-
-function printMarklist() {
-    // Reload page when print is canceled or finished
+/*function printMarklist() {
+    // Reload page after printing
     window.onafterprint = () => location.reload();
-    // Add a class to body for print styling
-    document.body.classList.add('print-mode');
 
-    // Hide the sidebar, header, buttons etc.
-    const aside = document.querySelector('aside');
-    const header = document.querySelector('header');
-    const buttons = document.querySelectorAll('button, a');
-    aside?.classList.add('hidden');
-    aside.style.display = "none";
-    header?.classList.add('hidden');
-    header.style.display = "none";
-    buttons.forEach(b => b.style.display = 'none');
+    // Hide unnecessary elements
+    document.querySelector("aside")?.style.setProperty("display", "none", "important");
+    document.querySelector("header")?.style.setProperty("display", "none", "important");
 
-    // Shrink padding and font size
-    const main = document.querySelector('main');
-    if(main) {
-        main.style.padding = '0.5rem';
-        main.style.fontSize = '0.85rem';
+    document.querySelectorAll("button, a").forEach(el => {
+        el.style.setProperty("display", "none", "important");
+    });
+
+    // Remove page spacing
+    document.body.style.margin = "0";
+    document.body.style.padding = "0";
+
+    const main = document.querySelector("main");
+    if (main) {
+        main.style.margin = "0";
+        main.style.padding = "2px";
+        main.style.width = "100%";
+        main.style.fontSize = "9px";
+        main.style.lineHeight = "1";
     }
 
-    // Trigger print
+    // Remove extra wrapper spacing
+    document.querySelectorAll("main > div, .overflow-x-auto").forEach(div => {
+        div.style.margin = "0";
+        div.style.padding = "0";
+        div.style.width = "100%";
+    });
+
+    // Reduce heading sizes
+    document.querySelectorAll("h1, h2, h3, h4, p").forEach(el => {
+        el.style.margin = "2px 0";
+        el.style.padding = "0";
+        el.style.lineHeight = "1";
+    });
+
+    document.querySelectorAll("h2").forEach(el => {
+        el.style.fontSize = "11px";
+    });
+
+    // Compact the table
+    document.querySelectorAll("table").forEach(table => {
+        table.style.width = "100%";
+        table.style.tableLayout = "fixed";
+        table.style.borderCollapse = "collapse";
+        table.style.fontSize = "9px";
+    });
+
+    // Compact every cell
+    document.querySelectorAll("th, td").forEach(cell => {
+        cell.style.padding = "1px 2px";
+        cell.style.fontSize = "9px";
+        cell.style.lineHeight = "1";
+        cell.style.whiteSpace = "nowrap";
+        cell.style.verticalAlign = "middle";
+    });
+
+    // Make rows shorter
+    document.querySelectorAll("tr").forEach(row => {
+        row.style.height = "16px";
+    });
+
+    // Print
+    window.print();
+}*/
+function printMarklist() {
+    window.onafterprint = () => location.reload();
+
+    // Hide unnecessary elements
+    document.querySelector("aside")?.style.setProperty("display", "none");
+    document.querySelector("header")?.style.setProperty("display", "none");
+    document.querySelectorAll("button, a").forEach(el => {
+        el.style.display = "none";
+    });
+
+    // Keep page almost full size
+    document.body.style.margin = "0";
+    document.body.style.padding = "0";
+
+    const main = document.querySelector("main");
+    if (main) {
+        main.style.padding = "0.25rem";
+        main.style.margin = "0";
+        main.style.fontSize = "0.8rem";      // 11.2px instead of 9px
+        main.style.width = "100%";
+    }
+
+    // Reduce wrapper spacing only a little
+    document.querySelectorAll(".overflow-x-auto").forEach(div => {
+        div.style.margin = "0";
+        div.style.padding = "0";
+    });
+
+    // Keep headings readable
+    document.querySelectorAll("h2").forEach(h => {
+        h.style.fontSize = "1rem";
+        h.style.margin = "0.2rem 0";
+    });
+
+    // Table uses full width
+    document.querySelectorAll("table").forEach(table => {
+        table.style.width = "100%";
+        table.style.borderCollapse = "collapse";
+        table.style.tableLayout = "auto"; // <-- don't use fixed
+        table.style.fontSize = "11px";
+    });
+
+    // Compact but not tiny
+    document.querySelectorAll("th, td").forEach(cell => {
+        cell.style.padding = "1.5px 3px";
+        cell.style.fontSize = "11px";
+        cell.style.lineHeight = "1.2";
+        cell.style.whiteSpace = "nowrap";
+    });
+
+    // Slightly shorter rows
+    document.querySelectorAll("tr").forEach(row => {
+        row.style.height = "18px";
+    });
+
     window.print();
 }
 </script>

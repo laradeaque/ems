@@ -21,6 +21,8 @@ class Learner(models.Model):
     admission_number = models.CharField(max_length=12, unique=True)
     grade = models.ForeignKey(Grade, on_delete=models.SET_NULL, null=True)
 
-
     def __str__(self):
+        return self.name
+
+    def __repr__(self):
         return f"{self.name} ({self.grade})"
