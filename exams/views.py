@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from .forms import ExamForm, ExamCodeForm
-from .models import Exam, Mark
+from .models import Exam, Mark,ExamCode
 from students.models import Learner, Grade
 from .utils import safe_eval
 import time
@@ -13,6 +13,7 @@ from django.contrib import messages
 
 @login_required
 def create_exam(request):
+    code = ExamCode.objects.filter(is_open=True)
     if request.method == 'POST':
         form = ExamForm(request.POST)
         if form.is_valid():
@@ -27,7 +28,7 @@ def create_exam(request):
             return render(request, 'create_exam.html', {'form': form})
     else:
         form = ExamForm()
-    return render(request, 'create_exam.html', {'form': form})
+    return render(request, 'create_exam.html', {'form': form, 'code_present': code})
 
 
 @login_required
@@ -203,7 +204,7 @@ def class_marklist(request):
     from .forms import ClassMarklistForm
     form = ClassMarklistForm(request.POST or None)
     exams = Exam.objects.filter(is_final=True)
-    exams = exams.filter(code__is_open=True)
+    #exams = exams.filter(code__is_open=True)
 
     if request.method == "POST" and form.is_valid():
         data = form.cleaned_data.copy()
