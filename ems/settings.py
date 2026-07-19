@@ -23,9 +23,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = "django-insecure-t@ulkc5_1+au+##k6)9mczz6ag@48c#+vb41u8o#^k9nh=+f5&"
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = ["192.168.100.54", "127.0.0.1", "192.168.100.13", "localhost"]
+ALLOWED_HOSTS = ["holyrosary.pythonanywhere.com"]
 
 
 # Application definition
@@ -120,13 +120,19 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
-STATIC_URL = "static/"
+STATIC_URL = '/static/'
 
+import os
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = 'accounts.User'
-ADMIN_CREATION_KEY = "SUPERSECRET123"
+ADMIN_CREATION_KEY = "HolySecret2026"
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'dashboard'
+>>>>>>> origin/server-updates

@@ -1,0 +1,36 @@
+{% extends "base_dashboard.html" %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto mt-10">
+    <div class="bg-white rounded-xl shadow-lg p-8 text-center">
+
+        <div class="text-6xl mb-4">🛠️</div>
+
+        <h1 class="text-2xl font-bold text-gray-800 mb-3">
+            We're Giving This Page a Little Upgrade
+        </h1>
+
+        <p></p>
+        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+            <p class="text-yellow-800">
+                <strong>🚧 Please excuse the construction dust!</strong> We're busy teaching this page some new tricks. It refused to learn overnight, so we're giving it a little extra coaching. 😄
+Please check back shortly—the updates are on the way, and normal service will resume as soon as the page graduates from its training! Thank you for your patience. 🎓
+            </p>
+        </div>
+
+        <p></p>
+
+        <div class="mt-8">
+            <a href="{% url 'dashboard' %}"
+               class="inline-block bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition">
+                ← Back to Dashboard
+            </a>
+        </div>
+
+        <p class="text-sm text-gray-500 mt-6">
+            Thank you for your patience and understanding. 🚀
+        </p>
+
+    </div>
+</div>
+{% endblock %}

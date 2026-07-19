@@ -13,12 +13,25 @@ class ExamCode(models.Model):
     def __str__(self):
         return self.exam_code
 
+class Subject(models.Model):
+    code = models.CharField(max_length=10)
+    name = models.CharField(max_length=50)
+    priority = models.PositiveIntegerField()
+
+    class Meta:
+        ordering = ["priority"]
+        unique_together = ('code', 'name')
+
+    def __str__(self):
+        return f'{self.name} ({self.code})'
+
 class Exam(models.Model):
     exam_code = models.CharField(max_length=20, null=True)  # old data
-    code = models.ForeignKey(ExamCode, on_delete=models.CASCADE, blank=True, null=True)
+    code = models.ForeignKey(ExamCode, on_delete=models.CASCADE, blank=True, null=True) #backward compatibility
     grade = models.ForeignKey(Grade, on_delete=models.CASCADE)
     subject_name = models.CharField(max_length=32)
-    max_score = models.FloatField()
+    subject = models.ForeignKey(Subject, on_delete=models.PROTECT, blank=True, null=True) # backward compatibility
+    max_score = models.FloatField(blank=True, null=True, default=100)
     date_taken = models.DateField()
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     is_final = models.BooleanField(default=False)  # ✅ NEW
@@ -26,7 +39,7 @@ class Exam(models.Model):
     depends_on = models.ManyToManyField("self", blank=True, symmetrical=False)
 
     class Meta:
-        unique_together = ('exam_code', 'grade', 'subject_name')
+        unique_together = ('exam_code', 'grade', 'subject')
 
     @property
     def resolved_exam_code(self):
@@ -52,13 +65,12 @@ class Mark(models.Model):
     def __str__(self):
         return f"{self.student.name} - {self.exam.exam_code} : {self.score}"
 
-
 # TO DO
 #
 #
 #
 #
-# USE THIS INSTEAD OF exam_code in views nce we have the resolved_exam_code for
+# USE THIS INSTEAD OF exam_code in views once we have the resolved_exam_code for
 # BACKWARD COMPATIBILITY exam.resolved_exam_code
 #
 #

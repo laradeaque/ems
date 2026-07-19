@@ -8,7 +8,10 @@ urlpatterns = [
     path('subject_marklist/', views.subject_marklist_select, name='subject_marklist'),
     path('subject_marklist/results/', views.subject_marklist_results, name='subject_marklist_results'),
     path('class_marklist/', views.class_marklist, name='class_marklist'),
+    path('double_class_marklist/', views.double_class_marklist, name='double'),
+    path('double_class_results/', views.double_class_results, name='double_results'),
     path('class_marklist/results/', views.class_marklist_results, name='class_marklist_results'),
     path('ajax/get-exams/', views.get_exams_by_grade, name='get_exams_by_grade'),
     path('learner/<int:learner_id>/performance/', views.learner_performance, name='learner_performance'),
+    path("ajax/exam-codes/", views.get_exam_codes, name="get_exam_codes"),
 ]
