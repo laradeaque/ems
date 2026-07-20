@@ -23,9 +23,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = "django-insecure-t@ulkc5_1+au+##k6)9mczz6ag@48c#+vb41u8o#^k9nh=+f5&"
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
-ALLOWED_HOSTS = ["holyrosary.pythonanywhere.com"]
+ALLOWED_HOSTS = ["holyrosary.pythonanywhere.com", "127.0.0.1"]
 
 
 # Application definition
@@ -135,4 +135,3 @@ AUTH_USER_MODEL = 'accounts.User'
 ADMIN_CREATION_KEY = "HolySecret2026"
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'dashboard'
->>>>>>> origin/server-updates

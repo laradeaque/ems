@@ -1,19 +1,26 @@
 from django.conf import settings
 from django.db import models
-import uuid
 
 
 class Grade(models.Model):
+    class Level(models.TextChoices):
+        NURSERY = "NURSERY", "Nursery"
+        LOWER_PRIMARY = "LOWER_PRIMARY", "Lower Primary"
+        UPPER_PRIMARY = "UPPER_PRIMARY", "Upper Primary"
+        JUNIOR_SCHOOL = "JUNIOR_SCHOOL", "Junior School"
+
     name = models.CharField(max_length=50, unique=True)
+    level = models.CharField(max_length=20, choices=Level.choices)
     class_teacher = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
-        blank=True, #limit_choices_to={'role': 'teacher'}  # only teachers
+        blank=True,
+        # limit_choices_to={"role": "teacher"}
     )
 
     def __str__(self):
-        return self.name
+        return f"{self.name} {self.level}"
 
 
 class Learner(models.Model):

@@ -1,0 +1,3214 @@
+ems/manage.py
+----------------------------------------
+#!/usr/bin/env python
+"""Django's command-line utility for administrative tasks."""
+import os
+import sys
+
+
+def main():
+    """Run administrative tasks."""
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "ems.settings")
+    try:
+        from django.core.management import execute_from_command_line
+    except ImportError as exc:
+        raise ImportError(
+            "Couldn't import Django. Are you sure it's installed and "
+            "available on your PYTHONPATH environment variable? Did you "
+            "forget to activate a virtual environment?"
+        ) from exc
+    execute_from_command_line(sys.argv)
+
+
+if __name__ == "__main__":
+    main()
+
+
+ems/results/apps.py
+----------------------------------------
+from django.apps import AppConfig
+
+
+class ResultsConfig(AppConfig):
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "results"
+
+
+ems/results/forms.py
+----------------------------------------
+from django import forms
+from students.models import Grade
+from exams.models import ExamCode
+
+class ReportForm(forms.Form):
+    style = "w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+
+    grade = forms.ModelChoiceField(
+        queryset=Grade.objects.all(),
+        widget=forms.Select(attrs={"class": style})
+    )
+
+    opener = forms.ModelChoiceField(
+        queryset=ExamCode.objects.all(),
+        widget=forms.Select(attrs={"class": style})
+    )
+
+    midterm = forms.ModelChoiceField(
+        queryset=ExamCode.objects.all(),
+        widget=forms.Select(attrs={"class": style})
+    )
+
+    endterm = forms.ModelChoiceField(
+        queryset=ExamCode.objects.all(),
+        widget=forms.Select(attrs={"class": style})
+    )
+
+ems/results/urls.py
+----------------------------------------
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path("get-report-forms/", views.get_report_forms, name="get_report_forms"),
+]
+
+ems/results/tests.py
+----------------------------------------
+from django.test import TestCase
+
+# Create your tests here.
+
+
+ems/results/views.py
+----------------------------------------
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render
+from django.http import FileResponse
+from django.conf import settings
+from exams.models import Exam, Mark, ExamCode
+from students.models import Learner, Grade
+from .utils import get_placeholders
+from .forms import ReportForm
+from copy import deepcopy
+from docx import Document
+from io import BytesIO
+from pathlib import Path
+
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+@login_required
+def get_report_forms(request):
+    form = ReportForm(request.POST or None)
+
+    if request.method == "POST" and form.is_valid():
+        grade = form.cleaned_data["grade"]
+
+        exam_codes = (
+            form.cleaned_data["opener"].exam_code,
+            form.cleaned_data["midterm"].exam_code,
+            form.cleaned_data["endterm"].exam_code,
+        )
+
+        filename = "PLAY.docx"
+        template_path = BASE_DIR / filename
+
+        placeholders = get_placeholders(docx_path=template_path)
+
+        reports = lookup(exam_codes, grade, placeholders)
+
+        file = generate_class_reports(template_path, reports)
+
+        return FileResponse(
+            file,
+            as_attachment=True,
+            filename=f"{grade.name} Report Forms.docx"
+        )
+
+
+    return; return render(request, "get_reportforms.html", {
+        "form": form
+    })
+
+
+def lookup(exam_codes, grade, placeholders):
+    learners = list(Learner.objects.filter(grade=grade))
+    exams = list(Exam.objects.filter(grade=grade, exam_code__in=exam_codes).select_related("subject"))
+    marks = list(Mark.objects.filter(student__in=learners, exam__in=exams))
+
+    exam_dict = {(exam.exam_code, exam.subject.code): exam.id for exam in exams}
+    mark_dict = {(mark.student_id, mark.exam_id): mark.score for mark in marks}
+
+    reports = {}
+
+    for learner in learners:
+        data = {}
+
+        for ph in placeholders:
+            if ph == "NAME":
+                data[ph] = learner.name
+                continue
+
+            if ph == "GRADE":
+                data[ph] = learner.grade.name
+                continue
+
+            if ph == "YEAR":
+                data[ph] = 2026
+                continue
+
+            if "_" not in ph:
+                continue
+
+            subject_code, term = ph.split("_")
+
+            if term == "0":
+                scores = []
+
+                for exam_code in exam_codes:
+                    exam_id = exam_dict.get((exam_code, subject_code))
+
+                    if exam_id:
+                        scores.append(
+                            mark_dict.get((learner.id, exam_id), 0)
+                        )
+
+                data[ph] = round(sum(scores) / len(scores), 2) if scores else ""
+                continue
+
+            if term == "1":
+                exam_code = exam_codes[0]
+
+            elif term == "2":
+                exam_code = exam_codes[1]
+
+            elif term == "3":
+                exam_code = exam_codes[2]
+
+            else:
+                data[ph] = ""
+                continue
+
+            exam_id = exam_dict.get((exam_code, subject_code))
+
+            data[ph] = mark_dict.get((learner.id, exam_id), "") if exam_id else ""
+
+        reports[learner] = data
+
+    print(reports)
+    return reports
+
+
+def replace_placeholders(doc, values):
+    for paragraph in doc.paragraphs:
+        for key, value in values.items():
+            placeholder = f"[{key}]"
+
+            if placeholder in paragraph.text:
+                for run in paragraph.runs:
+                    run.text = run.text.replace(placeholder, str(value))
+
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for paragraph in cell.paragraphs:
+                    for key, value in values.items():
+                        placeholder = f"[{key}]"
+
+                        if placeholder in paragraph.text:
+                            for run in paragraph.runs:
+                                run.text = run.text.replace(placeholder, str(value))
+
+
+def generate_class_reports(template_path, reports):
+    master = Document()
+
+    if master.paragraphs:
+        p = master.paragraphs[0]._element
+        p.getparent().remove(p)
+
+    for index, values in enumerate(reports.values()):
+        doc = Document(template_path)
+
+        replace_placeholders(doc, values)
+
+        for element in doc.element.body:
+            master.element.body.append(deepcopy(element))
+
+        if index < len(reports) - 1:
+            master.add_page_break()
+
+    buffer = BytesIO()
+    master.save(buffer)
+    buffer.seek(0)
+
+    return buffer
+
+
+ems/results/utils.py
+----------------------------------------
+import re
+from docx import Document
+
+PLACEHOLDER_PATTERN = re.compile(r"\[([A-Za-z0-9_]+)\]")
+
+def get_placeholders(docx_path=""):
+    """
+    Extract all placeholders like [NAME], [MAT_1], [TEST_0]
+    from a .docx file.
+
+    Returns:
+        list[str]: Unique placeholders (without brackets),
+                   in the order they first appear.
+    """
+    if not docx_path:
+        return []
+    doc = Document(docx_path)
+    placeholders = []
+
+    def extract(text):
+        for match in PLACEHOLDER_PATTERN.findall(text):
+            if match not in placeholders:
+                placeholders.append(match)
+
+    # Normal paragraphs
+    for paragraph in doc.paragraphs:
+        extract(paragraph.text)
+
+    # Tables
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                extract(cell.text)
+
+    return placeholders
+
+
+ems/results/admin.py
+----------------------------------------
+from django.contrib import admin
+
+# Register your models here.
+
+
+ems/results/__init__.py
+----------------------------------------
+
+
+ems/results/models.py
+----------------------------------------
+from django.db import models
+
+# Create your models here.
+
+
+ems/results/migrations/__init__.py
+----------------------------------------
+
+
+ems/students/apps.py
+----------------------------------------
+from django.apps import AppConfig
+
+
+class StudentsConfig(AppConfig):
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "students"
+
+
+ems/students/forms.py
+----------------------------------------
+from django import forms
+from .models import Learner
+
+class LearnerForm(forms.ModelForm):
+    class Meta:
+        model = Learner
+        fields = ['name', 'admission_number', 'grade']
+
+
+ems/students/urls.py
+----------------------------------------
+from django.urls import path
+from students import views
+
+urlpatterns = [
+    path('add/', views.add_student, name='add_learner'),
+    path('list/', views.learners_list, name='learners_list'),
+
+    # NEW
+    path('grades/', views.grade_list, name='grade_list'),
+    path('grades/add/', views.add_grade, name='add_grade'),
+    path('grades/<int:grade_id>/', views.grade_detail, name='grade_detail'),
+]
+
+
+ems/students/tests.py
+----------------------------------------
+from django.test import TestCase
+
+# Create your tests here.
+
+
+ems/students/views.py
+----------------------------------------
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
+from django.contrib import messages
+from .models import Learner, Grade
+from accounts.models import User
+import uuid
+
+
+@login_required
+def add_student(request):
+    s_id = uuid.uuid4().hex[:12].upper()
+    if request.user.role != 'admin':
+        return redirect('dashboard')
+
+    grades = Grade.objects.all()  # Fetch all grades from DB
+
+    if request.method == "POST":
+        name = request.POST.get("name")
+        admission_number = request.POST.get("admission_number")
+        grade_id = request.POST.get("grade")
+
+        if not (name and admission_number and grade_id):
+            messages.error(request, "All fields are required.")
+        else:
+            try:
+                grade_obj = get_object_or_404(Grade, id=grade_id)
+                learner = Learner.objects.create(
+                    name=name,
+                    admission_number=admission_number,
+                    grade=grade_obj
+                )
+                learner.save()
+                messages.success(request, f"Learner {name} added successfully!")
+                return redirect('add_learner')
+            except Grade.DoesNotExist:
+                messages.error(request, "Selected grade does not exist.")
+            except Exception as e:
+                messages.error(request, f"Error adding learner: {str(e)}")
+
+    return render(request, 'add_student.html', {
+        "lid": s_id,
+        "grades": grades
+    })
+
+
+@login_required
+def grade_list(request):
+    if request.user.role != 'admin':
+        return redirect('dashboard')
+
+    grades = Grade.objects.all()
+
+    return render(request, 'list_grades.html', {
+        'grades': grades
+    })
+
+
+@login_required
+def add_grade(request):
+    if request.user.role != 'admin':
+        return redirect('dashboard')
+
+    teachers = User.objects.filter(role='teacher')
+
+    if request.method == "POST":
+        name = request.POST.get("name")
+        teacher_id = request.POST.get("class_teacher")
+
+        if not name:
+            messages.error(request, "Grade name is required.")
+        else:
+            teacher = None
+            if teacher_id:
+                teacher = User.objects.filter(id=teacher_id).first()
+
+            Grade.objects.create(
+                name=name,
+                class_teacher=teacher
+            )
+
+            messages.success(request, f"Grade {name} created successfully!")
+            return redirect('grade_list')
+
+    return render(request, 'add_grade.html', {
+        "teachers": teachers
+    })
+
+@login_required
+def grade_detail(request, grade_id):
+    if request.user.role != 'admin':
+        return redirect('dashboard')
+
+    grade = get_object_or_404(Grade, id=grade_id)
+    learners = Learner.objects.select_related('grade').all()
+    learners = learners.filter(grade=grade)
+    teachers = User.objects.filter(role='teacher')
+
+    if request.method == "POST":
+        teacher_id = request.POST.get("class_teacher")
+
+        if teacher_id:
+            grade.class_teacher = get_object_or_404(User, id=teacher_id)
+        else:
+            grade.class_teacher = None
+
+        grade.save()
+        messages.success(request, "Class teacher updated.")
+        return redirect('grade_detail', grade_id=grade.id)
+
+    return render(request, 'grade_details.html', {
+        'grade': grade,
+        'learners': learners,
+        'teachers': teachers
+    })
+
+
+@login_required(login_url="/login/")
+def learners_list(request):
+    grades = Grade.objects.all()
+    learners = Learner.objects.select_related('grade').all()
+
+    # 🔍 FILTERS
+    grade_id = request.GET.get('grade', '')
+    learner_name = request.GET.get('learner_name', '')
+    print(learner_name)
+
+    if grade_id:
+        learners = learners.filter(grade_id=grade_id)
+
+    if learner_name:
+        learners = learners.filter(name__icontains=learner_name)
+
+    # 📄 PAGINATION (10 per page)
+    paginator = Paginator(learners, 10)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+
+
+    context = {
+        'page_obj': page_obj,
+        'grades': grades,
+        'filters': {
+            'selected_grade': grade_id or '',
+            'learner_name': learner_name or ''
+        }
+    }
+    return render(request, 'list_learners.html', context)
+
+
+ems/students/admin.py
+----------------------------------------
+from django.contrib import admin
+from .models import Grade, Learner
+
+@admin.register(Grade)
+class GradeAdmin(admin.ModelAdmin):
+    list_display = ('name', 'class_teacher')
+
+@admin.register(Learner)
+class LearnerAdmin(admin.ModelAdmin):
+    list_display = ('name', 'admission_number', 'grade')
+
+
+ems/students/__init__.py
+----------------------------------------
+
+
+ems/students/models.py
+----------------------------------------
+from django.conf import settings
+from django.db import models
+import uuid
+
+
+class Grade(models.Model):
+    name = models.CharField(max_length=50, unique=True)
+    class_teacher = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True, #limit_choices_to={'role': 'teacher'}  # only teachers
+    )
+
+    def __str__(self):
+        return self.name
+
+
+class Learner(models.Model):
+    name = models.CharField(max_length=100)
+    admission_number = models.CharField(max_length=12, unique=True)
+    grade = models.ForeignKey(Grade, on_delete=models.SET_NULL, null=True)
+
+    def __str__(self):
+        return self.name
+
+    def __repr__(self):
+        return f"{self.name} ({self.grade})"
+
+
+ems/students/migrations/0001_initial.py
+----------------------------------------
+# Generated by Django 4.2.3 on 2026-03-22 14:02
+
+from django.db import migrations, models
+import django.db.models.deletion
+
+
+class Migration(migrations.Migration):
+    initial = True
+
+    dependencies = []
+
+    operations = [
+        migrations.CreateModel(
+            name="Grade",
+            fields=[
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("name", models.CharField(max_length=50, unique=True)),
+            ],
+        ),
+        migrations.CreateModel(
+            name="Learner",
+            fields=[
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("name", models.CharField(max_length=100)),
+                (
+                    "admission_number",
+                    models.CharField(editable=False, max_length=12, unique=True),
+                ),
+                (
+                    "grade",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        to="students.grade",
+                    ),
+                ),
+            ],
+        ),
+    ]
+
+
+ems/students/migrations/0002_alter_learner_admission_number.py
+----------------------------------------
+# Generated by Django 4.2.3 on 2026-03-22 20:09
+
+from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+    dependencies = [
+        ("students", "0001_initial"),
+    ]
+
+    operations = [
+        migrations.AlterField(
+            model_name="learner",
+            name="admission_number",
+            field=models.CharField(max_length=12, unique=True),
+        ),
+    ]
+
+
+ems/students/migrations/0003_grade_class_teacher.py
+----------------------------------------
+# Generated by Django 4.2 on 2026-04-27 05:07
+
+from django.conf import settings
+from django.db import migrations, models
+import django.db.models.deletion
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
+        ('students', '0002_alter_learner_admission_number'),
+    ]
+
+    operations = [
+        migrations.AddField(
+            model_name='grade',
+            name='class_teacher',
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to=settings.AUTH_USER_MODEL),
+        ),
+    ]
+
+
+ems/students/migrations/__init__.py
+----------------------------------------
+
+
+ems/accounts/apps.py
+----------------------------------------
+from django.apps import AppConfig
+
+
+class AccountsConfig(AppConfig):
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "accounts"
+
+
+ems/accounts/forms.py
+----------------------------------------
+# accounts/forms.py
+from django import forms
+from .models import User
+from django.conf import settings
+
+
+class RegisterForm(forms.ModelForm):
+    password = forms.CharField(widget=forms.PasswordInput)
+    admin_key = forms.CharField(required=False)
+
+    class Meta:
+        model = User
+        fields = ['username', 'password', 'role']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        for field in self.fields.values():
+            field.widget.attrs.update({
+                'class': 'w-full mt-1 p-2 border rounded focus:ring-2 focus:ring-green-500 focus:outline-none'
+            })
+
+    def clean(self):
+        cleaned_data = super().clean()
+        role = cleaned_data.get('role')
+        admin_key = cleaned_data.get('admin_key')
+
+        if role == 'admin':
+            if admin_key != settings.ADMIN_CREATION_KEY:
+                raise forms.ValidationError("Invalid admin pass key")
+
+        return cleaned_data
+
+
+ems/accounts/collector.py
+----------------------------------------
+
+
+ems/accounts/urls.py
+----------------------------------------
+from django.urls import path
+from django.contrib.auth import views as auth_views
+from . import views
+
+urlpatterns = [
+    path('', views.dashboard, name='dashboard'),
+    path('teacher/', views.teacher, name='teacher_url'),
+    path('register/', views.register, name='register'),
+    path('login/', views.login_view, name='login'),
+    path('reset-password/', views.reset_password, name='reset_password'),
+    path('logout/', auth_views.LogoutView.as_view(next_page='login'), name='logout'),
+]
+
+
+ems/accounts/tests.py
+----------------------------------------
+from django.test import TestCase
+
+# Create your tests here.
+
+
+ems/accounts/views.py
+----------------------------------------
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.hashers import make_password
+from django.contrib.auth import authenticate, login
+from django.shortcuts import render, redirect
+from django.core.paginator import Paginator
+from students.models import Learner, Grade
+from exams.models import Exam, ExamCode
+from collections import defaultdict
+from django.contrib import messages
+from django.utils import timezone
+from django.conf import settings
+from .forms import RegisterForm
+from datetime import timedelta
+from .models import User
+
+def reset_password(request):
+    if request.method == "POST":
+        username = request.POST.get("username")
+        new_password = request.POST.get("new_password")
+        admin_key = request.POST.get("admin_key")
+
+        # check admin key first
+        if admin_key != settings.ADMIN_CREATION_KEY:
+            return render(request, "reset_password.html", {
+                "error": "Invalid admin pass key"
+            })
+        try:
+            user = User.objects.get(username=username)
+            user.password = make_password(new_password)
+            user.save()
+            messages.success(request, "Password reset successful. Please log in.")
+            return redirect("login")
+        except User.DoesNotExist:
+            return render(request, "reset_password.html", {
+                "error": "User not found"
+            })
+    return render(request, "reset_password.html")
+
+def close_expired_exam_codes():
+    cutoff_date = timezone.now().date() - timedelta(days=14)
+
+    ExamCode.objects.filter(
+        is_open=True,
+        date_taken__lt=cutoff_date
+    ).update(is_open=False)
+
+
+def register(request):
+    if request.user.is_authenticated:
+        return redirect('dashboard')
+
+    if request.method == 'POST':
+        form = RegisterForm(request.POST)
+        if form.is_valid():
+            user = form.save(commit=False)
+            user.set_password(form.cleaned_data['password'])
+            user.save()
+
+            login(request, user)
+            messages.success(request, "Account created successfully.")
+            return redirect('dashboard')
+    else:
+        form = RegisterForm()
+
+    return render(request, 'register.html', {'form': form})
+
+
+def login_view(request):
+    if request.user.is_authenticated:
+        return redirect('dashboard')
+
+    error = None
+
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+
+        user = authenticate(username=username, password=password)
+
+        if user:
+            login(request, user)
+            messages.success(request, "Account logged in successfully.")
+            return redirect('dashboard')
+        else:
+            error = "Invalid username or password"
+
+    return render(request, 'login.html', {'error': error})
+
+
+@login_required(login_url="/login/")
+def dashboard(request):
+    close_expired_exam_codes()
+    if request.user.role == 'admin':
+        total_learners = Learner.objects.count()
+        classes = Grade.objects.count()
+        users = User.objects.count()
+        user_active = User.objects.filter(is_active=True).count()
+
+        return render(request, 'admin.html', {
+            'total_learners': total_learners,
+            'users': users,
+            'users_active': user_active,
+            'classes': classes
+        })
+    else:
+        return render(request, "updates.html")
+        #return teacher(request)
+
+@login_required(login_url="/login/")
+def teacher(request):
+    exams = Exam.objects.select_related('grade').order_by('-date_taken')
+
+    # 🔍 FILTERS
+    code = request.GET.get('code')
+    grade = request.GET.get('grade')
+    subject = request.GET.get('subject')
+
+    if code:
+        exams = exams.filter(code_id=code)
+
+    if grade:
+        exams = exams.filter(grade_id=grade)
+
+    if subject:
+        exams = exams.filter(subject_name__icontains=subject)
+
+    if request.user.role != "admin":
+        exams = exams.filter(created_by=request.user)
+
+    # 📄 PAGINATION (10 per page)
+    paginator = Paginator(exams, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    # 📦 GROUP BY exam_code
+    grouped_exams = defaultdict(list)
+    for exam in page_obj:
+        grouped_exams[exam.exam_code].append(exam)
+
+    context = {
+        'page_obj': page_obj,
+        'grouped_exams': dict(grouped_exams),
+        'codes': ExamCode.objects.filter(is_open=True),
+        'grades': Grade.objects.all(),
+        'filters': {
+            'code': code or '',
+            'grade': grade or '',
+            'subject': subject or ''
+        }
+    }
+
+    return render(request, 'teacher.html', context)
+
+
+ems/accounts/admin.py
+----------------------------------------
+from django.contrib import admin
+from .models import User
+# Register your models here.
+
+
+admin.site.register(User)
+
+
+ems/accounts/__init__.py
+----------------------------------------
+
+
+ems/accounts/models.py
+----------------------------------------
+from django.contrib.auth.models import AbstractUser
+from django.db import models
+
+
+class User(AbstractUser):
+    ROLE_CHOICES = (
+        ('admin', 'Admin'),
+        ('teacher', 'Teacher'),
+    )
+
+    role = models.CharField(
+        max_length=10,
+        choices=ROLE_CHOICES
+    )
+
+
+ems/accounts/migrations/0001_initial.py
+----------------------------------------
+# Generated by Django 4.2.3 on 2026-03-22 12:57
+
+import django.contrib.auth.models
+import django.contrib.auth.validators
+from django.db import migrations, models
+import django.utils.timezone
+
+
+class Migration(migrations.Migration):
+    initial = True
+
+    dependencies = [
+        ("auth", "0012_alter_user_first_name_max_length"),
+    ]
+
+    operations = [
+        migrations.CreateModel(
+            name="User",
+            fields=[
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("password", models.CharField(max_length=128, verbose_name="password")),
+                (
+                    "last_login",
+                    models.DateTimeField(
+                        blank=True, null=True, verbose_name="last login"
+                    ),
+                ),
+                (
+                    "is_superuser",
+                    models.BooleanField(
+                        default=False,
+                        help_text="Designates that this user has all permissions without explicitly assigning them.",
+                        verbose_name="superuser status",
+                    ),
+                ),
+                (
+                    "username",
+                    models.CharField(
+                        error_messages={
+                            "unique": "A user with that username already exists."
+                        },
+                        help_text="Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only.",
+                        max_length=150,
+                        unique=True,
+                        validators=[
+                            django.contrib.auth.validators.UnicodeUsernameValidator()
+                        ],
+                        verbose_name="username",
+                    ),
+                ),
+                (
+                    "first_name",
+                    models.CharField(
+                        blank=True, max_length=150, verbose_name="first name"
+                    ),
+                ),
+                (
+                    "last_name",
+                    models.CharField(
+                        blank=True, max_length=150, verbose_name="last name"
+                    ),
+                ),
+                (
+                    "email",
+                    models.EmailField(
+                        blank=True, max_length=254, verbose_name="email address"
+                    ),
+                ),
+                (
+                    "is_staff",
+                    models.BooleanField(
+                        default=False,
+                        help_text="Designates whether the user can log into this admin site.",
+                        verbose_name="staff status",
+                    ),
+                ),
+                (
+                    "is_active",
+                    models.BooleanField(
+                        default=True,
+                        help_text="Designates whether this user should be treated as active. Unselect this instead of deleting accounts.",
+                        verbose_name="active",
+                    ),
+                ),
+                (
+                    "date_joined",
+                    models.DateTimeField(
+                        default=django.utils.timezone.now, verbose_name="date joined"
+                    ),
+                ),
+                (
+                    "role",
+                    models.CharField(
+                        choices=[("admin", "Admin"), ("teacher", "Teacher")],
+                        max_length=10,
+                    ),
+                ),
+                (
+                    "groups",
+                    models.ManyToManyField(
+                        blank=True,
+                        help_text="The groups this user belongs to. A user will get all permissions granted to each of their groups.",
+                        related_name="user_set",
+                        related_query_name="user",
+                        to="auth.group",
+                        verbose_name="groups",
+                    ),
+                ),
+                (
+                    "user_permissions",
+                    models.ManyToManyField(
+                        blank=True,
+                        help_text="Specific permissions for this user.",
+                        related_name="user_set",
+                        related_query_name="user",
+                        to="auth.permission",
+                        verbose_name="user permissions",
+                    ),
+                ),
+            ],
+            options={
+                "verbose_name": "user",
+                "verbose_name_plural": "users",
+                "abstract": False,
+            },
+            managers=[
+                ("objects", django.contrib.auth.models.UserManager()),
+            ],
+        ),
+    ]
+
+
+ems/accounts/migrations/__init__.py
+----------------------------------------
+
+
+ems/ems/urls.py
+----------------------------------------
+"""
+URL configuration for ems project.
+
+The `urlpatterns` list routes URLs to views. For more information please see:
+    https://docs.djangoproject.com/en/4.2/topics/http/urls/
+Examples:
+Function views
+    1. Add an import:  from my_app import views
+    2. Add a URL to urlpatterns:  path('', views.home, name='home')
+Class-based views
+    1. Add an import:  from other_app.views import Home
+    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
+Including another URLconf
+    1. Import the include() function: from django.urls import include, path
+    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
+"""
+from django.contrib import admin
+from django.urls import path, include
+
+urlpatterns = [
+    path('', include('accounts.urls')),
+    path("admin/", admin.site.urls),
+    path('l/', include('students.urls')),
+    path('e/', include('exams.urls')),
+    path('r/', include('results.urls')),
+]
+
+
+ems/ems/settings.py
+----------------------------------------
+"""
+Django settings for ems project.
+
+Generated by 'django-admin startproject' using Django 4.2.3.
+
+For more information on this file, see
+https://docs.djangoproject.com/en/4.2/topics/settings/
+
+For the full list of settings and their values, see
+https://docs.djangoproject.com/en/4.2/ref/settings/
+"""
+
+from pathlib import Path
+
+# Build paths inside the project like this: BASE_DIR / 'subdir'.
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+# Quick-start development settings - unsuitable for production
+# See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
+
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = "django-insecure-t@ulkc5_1+au+##k6)9mczz6ag@48c#+vb41u8o#^k9nh=+f5&"
+
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = True
+
+ALLOWED_HOSTS = ["holyrosary.pythonanywhere.com", "127.0.0.1"]
+
+
+# Application definition
+
+INSTALLED_APPS = [
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    "accounts",
+    "exams.apps.ExamsConfig",
+    "students",
+    "results",
+]
+
+MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+]
+
+ROOT_URLCONF = "ems.urls"
+
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.debug",
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+            ],
+        },
+    },
+]
+
+WSGI_APPLICATION = "ems.wsgi.application"
+
+
+# Database
+# https://docs.djangoproject.com/en/4.2/ref/settings/#databases
+
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
+        # "NAME": BASE_DIR / "db - Copy (2).sqlite3",
+    }
+}
+
+
+# Password validation
+# https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
+
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
+    },
+    {
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+    },
+    {
+        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
+    },
+    {
+        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
+    },
+]
+
+
+# Internationalization
+# https://docs.djangoproject.com/en/4.2/topics/i18n/
+
+LANGUAGE_CODE = "en-us"
+
+TIME_ZONE = "UTC"
+
+USE_I18N = True
+
+USE_TZ = True
+
+
+# Static files (CSS, JavaScript, Images)
+# https://docs.djangoproject.com/en/4.2/howto/static-files/
+
+STATIC_URL = '/static/'
+
+import os
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+# Default primary key field type
+# https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
+
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+AUTH_USER_MODEL = 'accounts.User'
+ADMIN_CREATION_KEY = "HolySecret2026"
+LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = 'dashboard'
+
+
+ems/ems/settings-legacy.py
+----------------------------------------
+"""
+Django settings for ems project.
+
+Generated by 'django-admin startproject' using Django 4.2.3.
+
+For more information on this file, see
+https://docs.djangoproject.com/en/4.2/topics/settings/
+
+For the full list of settings and their values, see
+https://docs.djangoproject.com/en/4.2/ref/settings/
+"""
+
+from pathlib import Path
+
+# Build paths inside the project like this: BASE_DIR / 'subdir'.
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+# Quick-start development settings - unsuitable for production
+# See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
+
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = "django-insecure-t@ulkc5_1+au+##k6)9mczz6ag@48c#+vb41u8o#^k9nh=+f5&"
+
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = True
+
+ALLOWED_HOSTS = ["192.168.100.54", "127.0.0.1", "192.168.100.13", "localhost"]
+
+
+# Application definition
+
+INSTALLED_APPS = [
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    "accounts",
+    "exams.apps.ExamsConfig",
+    "students",
+    "results",
+]
+
+MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+]
+
+ROOT_URLCONF = "ems.urls"
+
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.debug",
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+            ],
+        },
+    },
+]
+
+WSGI_APPLICATION = "ems.wsgi.application"
+
+
+# Database
+# https://docs.djangoproject.com/en/4.2/ref/settings/#databases
+
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
+        # "NAME": BASE_DIR / "db - Copy (2).sqlite3",
+    }
+}
+
+
+# Password validation
+# https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
+
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
+    },
+    {
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+    },
+    {
+        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
+    },
+    {
+        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
+    },
+]
+
+
+# Internationalization
+# https://docs.djangoproject.com/en/4.2/topics/i18n/
+
+LANGUAGE_CODE = "en-us"
+
+TIME_ZONE = "UTC"
+
+USE_I18N = True
+
+USE_TZ = True
+
+
+# Static files (CSS, JavaScript, Images)
+# https://docs.djangoproject.com/en/4.2/howto/static-files/
+
+STATIC_URL = "static/"
+
+# Default primary key field type
+# https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
+
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+AUTH_USER_MODEL = 'accounts.User'
+ADMIN_CREATION_KEY = "SUPERSECRET123"
+LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = 'dashboard'
+
+
+ems/ems/wsgi.py
+----------------------------------------
+"""
+WSGI config for ems project.
+
+It exposes the WSGI callable as a module-level variable named ``application``.
+
+For more information on this file, see
+https://docs.djangoproject.com/en/4.2/howto/deployment/wsgi/
+"""
+
+import os
+
+from django.core.wsgi import get_wsgi_application
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "ems.settings")
+
+application = get_wsgi_application()
+
+
+ems/ems/__init__.py
+----------------------------------------
+
+
+ems/ems/asgi.py
+----------------------------------------
+"""
+ASGI config for ems project.
+
+It exposes the ASGI callable as a module-level variable named ``application``.
+
+For more information on this file, see
+https://docs.djangoproject.com/en/4.2/howto/deployment/asgi/
+"""
+
+import os
+
+from django.core.asgi import get_asgi_application
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "ems.settings")
+
+application = get_asgi_application()
+
+
+ems/exams/apps.py
+----------------------------------------
+from django.apps import AppConfig
+
+
+class ExamsConfig(AppConfig):
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "exams"
+
+    def ready(self):
+        import exams.signals
+
+
+ems/exams/forms.py
+----------------------------------------
+from django import forms
+from .models import Exam, ExamCode, Subject
+from students.models import Grade
+
+# forms.py
+
+class DoubleClassMarklistForm(forms.Form):
+    style = 'w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:outline-none'
+
+    first_grade = forms.ModelChoiceField(
+        queryset=Grade.objects.all(),
+        widget=forms.Select(attrs={'class': style})
+    )
+
+    second_grade = forms.ModelChoiceField(
+        queryset=Grade.objects.all(),
+        widget=forms.Select(attrs={'class': style})
+    )
+
+    exam_code = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'placeholder': 'AAA-BB0-0000',
+            'class': style
+        })
+    )
+
+    show_points_only = forms.BooleanField(
+        required=False
+    )
+
+class ExamCodeForm(forms.ModelForm):
+    class Meta:
+        model = ExamCode
+        fields = ['code', "is_open"]
+
+    code = forms.CharField(
+        required=True,
+        label="Exam Code",
+        widget=forms.TextInput(attrs={
+            'placeholder': 'XX-XX0-0000',
+            'class': 'w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:outline-none'
+        })
+    )
+    is_open = forms.BooleanField(
+        required=False,
+        label="Is Exam Open?",
+        widget=forms.CheckboxInput(attrs={
+            'class': 'p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:outline-none'
+        })
+    )
+
+
+class ExamForm(forms.ModelForm):
+    class Meta:
+        model = Exam
+        fields = ['code', 'grade', 'subject', 'date_taken']
+        widgets = {
+            'code': forms.Select(attrs={'class':'w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:outline-none'}),
+            'grade': forms.Select(attrs={'class': 'w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:outline-none'}),
+            'subject': forms.Select(attrs={'class': 'w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:outline-none'}),
+            #'subject_name': forms.TextInput(attrs={'class': 'w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:outline-none'}),
+            #'max_score': forms.NumberInput(attrs={'class': 'w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:outline-none'}),
+            'date_taken': forms.DateInput(attrs={'class': 'w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:outline-none', 'type': 'date'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['code'].queryset = ExamCode.objects.filter(is_open=True)
+        self.fields['subject'].queryset = Subject.objects.filter()
+
+
+class SubjectMarklistForm(forms.Form):
+    exam = forms.ModelChoiceField(
+        queryset=Exam.objects.select_related('grade')
+        .order_by('grade__name', 'exam_code', 'subject_name'),
+        label="Select Exam",
+        widget=forms.Select(attrs={
+            'class':
+                'w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:outline-none'
+            }
+        ),
+    )
+
+    subject = forms.ModelChoiceField(
+        queryset=Subject.objects.filter(),
+        label="Select subject",
+        widget=forms.Select(attrs={
+            'class':
+                'w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:outline-none'
+            }
+        ),
+    )
+
+    formula = forms.CharField(
+        required=False,
+        label="Formula (optional)",
+        widget=forms.TextInput(attrs={
+            'placeholder': 'e.g. x*2 or (x/50)*100',
+            'class': 'w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:outline-none'
+        })
+    )
+    paper_name = forms.CharField(
+        max_length=50,
+        required=False,
+        label="Enter Exam Name",
+        widget=forms.TextInput(attrs={
+            'class':
+                'w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:outline-none'
+            }
+        )
+    )
+
+
+class ClassMarklistForm(forms.Form):
+    style = 'w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:outline-none'
+    grade = forms.ModelChoiceField(
+        queryset=Grade.objects.all(),
+        widget=forms.Select(attrs={'class': style}),
+    )
+
+    exam_code = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'placeholder': 'AAA-BB0-0000',
+            'class': style
+        })
+    )
+
+    show_points_only = forms.BooleanField(
+        required=False,
+        label="Show Points Only",
+        widget=forms.CheckboxInput(attrs={
+            'class': 'p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:outline-none'
+        })
+    )
+
+
+ems/exams/urls.py
+----------------------------------------
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('create_exam/', views.create_exam, name='create_exam'),
+    path('create_exam_code/', views.create_exam_code, name='create_exam_code'),
+    path('enter_marks/<int:exam_id>/', views.enter_marks, name='enter_marks'),
+    path('subject_marklist/', views.subject_marklist_select, name='subject_marklist'),
+    path('subject_marklist/results/', views.subject_marklist_results, name='subject_marklist_results'),
+    path('class_marklist/', views.class_marklist, name='class_marklist'),
+    path('double_class_marklist/', views.double_class_marklist, name='double'),
+    path('double_class_results/', views.double_class_results, name='double_results'),
+    path('class_marklist/results/', views.class_marklist_results, name='class_marklist_results'),
+    path('ajax/get-exams/', views.get_exams_by_grade, name='get_exams_by_grade'),
+    path('learner/<int:learner_id>/performance/', views.learner_performance, name='learner_performance'),
+    path("ajax/exam-codes/", views.get_exam_codes, name="get_exam_codes"),
+]
+
+
+ems/exams/tests.py
+----------------------------------------
+from django.test import TestCase
+
+# Create your tests here.
+
+
+ems/exams/signals.py
+----------------------------------------
+from django.db.models.signals import post_save, post_delete
+from django.dispatch import receiver
+from django.db import transaction
+from exams.models import Mark, Exam
+from exams.services.recalculate import recalc_exam
+from exams.signal_state import signals_enabled
+
+
+def trigger_recalc(raw_exam):
+    # 🚨 prevent recursion trigger
+    if not signals_enabled():
+        return
+
+    final_exams = Exam.objects.filter(
+        is_final=True,
+        depends_on=raw_exam
+    )
+
+    for final_exam in final_exams:
+        # ensure DB commit before recalculation
+        transaction.on_commit(lambda e=final_exam: recalc_exam(e))
+
+
+@receiver(post_save, sender=Mark)
+def mark_saved(sender, instance, **kwargs):
+    trigger_recalc(instance.exam)
+
+
+@receiver(post_delete, sender=Mark)
+def mark_deleted(sender, instance, **kwargs):
+    trigger_recalc(instance.exam)
+
+
+ems/exams/views.py
+----------------------------------------
+from .forms import ExamForm, ExamCodeForm, DoubleClassMarklistForm
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from students.models import Learner, Grade
+from .models import Exam, Mark, ExamCode, Subject
+from django.http import JsonResponse
+from django.contrib import messages
+from django.db import transaction
+from django.db import models
+from .utils import safe_eval
+
+@login_required
+def double_class_marklist(request):
+    form = DoubleClassMarklistForm(request.POST or None)
+    if request.user.role == "admin":
+        exams = Exam.objects.all()
+    else:
+        exams = Exam.objects.filter(code__is_open=True)
+
+    if request.method == "POST" and form.is_valid():
+        data = {
+            "first_grade": form.cleaned_data["first_grade"].id,
+            "second_grade": form.cleaned_data["second_grade"].id,
+            "exam_code": form.cleaned_data["exam_code"],
+            "show_points_only": form.cleaned_data["show_points_only"],
+        }
+
+        request.session["double_class_data"] = data
+
+        return redirect("double_results")
+
+    return render(request, "double_classlist.html", {
+        "form": form,
+        "exams": exams
+    })
+
+
+@login_required
+def double_class_results(request):
+    """
+    Page 2: Show Class Marklist results for two classes
+    """
+    data = request.session.get("double_class_data")
+    if not data:
+        return redirect("double")
+
+    first_grade = get_object_or_404(
+        Grade,
+        id=data["first_grade"]
+    )
+
+    second_grade = get_object_or_404(
+        Grade,
+        id=data["second_grade"]
+    )
+
+    exam_code = data["exam_code"]
+    show_points = data.get("show_points_only", False)
+
+    # Fetch exams for both classes
+    exams = Exam.objects.filter(
+        grade__in=[first_grade, second_grade],
+        is_final=True
+    ).filter(
+        models.Q(exam_code=exam_code) |
+        models.Q(code__exam_code=exam_code)
+    )
+
+    # Unique subjects for table columns
+    subjects = list(
+        exams.values_list(
+            "subject_name",
+            flat=True
+        ).distinct()
+    )
+    subjects = [
+        subject.code
+        for subject in Subject.objects.filter(exam__in=exams).distinct().order_by("priority")
+    ]
+
+    # All learners from both classes
+    learners = Learner.objects.filter(
+        grade__in=[first_grade, second_grade]
+    ).select_related("grade")
+
+    # Initialize totals
+    subject_totals = {subject: 0 for subject in subjects}
+
+    # Fetch all marks once
+    all_marks = Mark.objects.filter(
+        student__in=learners,
+        exam__in=exams
+    )
+
+    # Fast lookup for marks
+    mark_dict = {
+        (m.student_id, m.exam_id): int(m.score)
+        for m in all_marks
+    }
+
+    # Fast lookup for exams
+    exam_lookup = {
+        (exam.grade_id, exam.subject.code): exam.id
+        for exam in exams
+    }
+
+    results = []
+
+    for student in learners:
+        student_data = {
+            'student': student,
+            'scores': {},
+            'total': 0
+        }
+
+        total = 0
+
+        for subject in subjects:
+
+            # Get the correct exam for this student's class
+            exam_id = exam_lookup.get(
+                (student.grade_id, subject)
+            )
+
+            score = 0
+            if exam_id:
+                score = mark_dict.get(
+                    (student.id, exam_id),
+                    0
+                )
+
+            value = get_points(score) if show_points else score
+
+            student_data['scores'][subject] = value
+
+            total += value
+
+            subject_totals[subject] += (
+                value if show_points else score
+            )
+
+        student_data['total'] = total
+        student_data['average'] = (
+            total / len(subjects)
+            if subjects else 0
+        )
+
+        results.append(student_data)
+
+    # Compute means
+    num_students = len(learners)
+
+    subject_means = {
+        subject: round(
+            subject_totals[subject] / num_students,
+            2
+        ) if num_students > 0 else 0
+        for subject in subjects
+    }
+
+    # Class stats
+    class_total = sum(
+        r['total']
+        for r in results
+    )
+
+    class_mean = round(
+        class_total / len(results),
+        2
+    ) if results else 0
+
+    # Sort by total descending
+    results.sort(
+        key=lambda x: x['total'],
+        reverse=True
+    )
+
+    return render(request, 'class_marklist.html', {
+        'results': results,
+        'subjects': subjects,
+        'selected_grade': f"{first_grade.name} and {second_grade.name}",
+        'exam_code': exam_code,
+        'subject_totals': subject_totals,
+        'subject_means': subject_means,
+        'class_total': class_total,
+        'class_mean': class_mean,
+        'double': True,
+        'show_points': show_points
+    })
+
+@login_required
+def create_exam(request):
+    if request.method == 'POST':
+        form = ExamForm(request.POST)
+        if form.is_valid():
+            exam = form.save(commit=False)
+            #if int(exam.max_score) == int(100):
+            exam.is_final = True
+
+            exam.created_by = request.user
+            existing_exam = Exam.objects.filter(
+                exam_code=exam.code.exam_code,
+                grade=exam.grade,
+                #subject_name=exam.subject_name
+                subject_name=exam.subject.code
+            ).first()
+
+            if existing_exam:
+                messages.success(request, "Exam already exists. Opening marks entry...")
+                return redirect('enter_marks', exam_id=existing_exam.id)
+            else:
+                exam.save()
+                return redirect('enter_marks', exam_id=exam.id)
+        else:
+            messages.error(request, form.errors)
+            code_present = ExamCode.objects.filter(is_open=True).exists()
+            return render(request, 'create_exam.html', {'form': form, 'code_present': code_present})
+    else:
+        form = ExamForm()
+        code_present = ExamCode.objects.filter(is_open=True).exists()
+    return render(request, 'create_exam.html', {'form': form, 'code_present': code_present})
+
+
+@login_required
+def create_exam_code(request):
+    if request.method == 'POST':
+        form = ExamCodeForm(request.POST)
+        if form.is_valid():
+            exam = form.save(commit=False)
+            exam.created_by = request.user
+            exam.exam_code = request.POST.get('code')
+            exam.save()
+            return redirect('teacher_url')
+        else:
+            messages.error(request, form.errors)
+            return render(request, 'create_exam_code.html', {'form': form})
+    else:
+        form = ExamCodeForm()
+    return render(request, 'create_exam_code.html', {'form': form})
+
+
+@login_required
+def enter_marks(request, exam_id):
+    exam = get_object_or_404(Exam, id=exam_id)
+    students = Learner.objects.filter(grade=exam.grade).order_by('name')
+
+    # Fetch existing marks for this exam
+    existing_marks = {
+        mark.student_id: mark.score
+        for mark in Mark.objects.filter(exam=exam)
+    }
+
+    if request.method == 'POST':
+        for student in students:
+            score = request.POST.get(f'score_{student.id}')
+
+            if score:  # save only if value entered
+                Mark.objects.update_or_create(
+                    student=student,
+                    exam=exam,
+                    defaults={'score': float(score)}
+                )
+        messages.success(request, f'Exam {exam.subject.name}({exam.grade}) entered successfully!')
+        return redirect('dashboard')
+
+    return render(request, 'enter_marks.html', {
+        'exam': exam,
+        'students': students,
+        'existing_marks': existing_marks  # 👈 pass this
+    })
+
+
+@login_required
+def subject_marklist_select(request):
+    from .forms import SubjectMarklistForm
+
+    form = SubjectMarklistForm(request.POST or None)
+
+    # ✅ Get unique grades sorted
+    grades = Grade.objects.all().order_by('name')
+
+    if request.method == "POST" and form.is_valid():
+        data = form.cleaned_data.copy()
+        data['exam'] = data['exam'].id
+        data['subject'] = data['subject'].id
+        request.session['subject_form_data'] = data
+        return redirect('subject_marklist_results')
+
+    return render(request, "subject_marklist_select.html", {
+        "form": form,
+        "grades": grades  # 👈 IMPORTANT
+    })
+
+
+@login_required
+def subject_marklist_results(request):
+    # Get form data from session
+    data = request.session.get('subject_form_data')
+    if not data:
+        return redirect('subject_marklist')
+
+    final_subject_name = ""
+    results = []
+    selected_exam = None
+    total_score = 0
+    learners = 0
+    mean_score = 0
+
+    selected_exam_id = data['exam']
+    selected_exam = get_object_or_404(Exam, id=selected_exam_id)  # retrieve the object
+    selected_subject = get_object_or_404(Subject, id=data["subject"])
+    formula = data.get('formula')
+    final_subject_name = data.get('paper_name', "")
+
+    # ✅ Create/Get final exam if a new paper name is given
+    if final_subject_name:
+        final_exam, _ = Exam.objects.get_or_create(
+            exam_code=selected_exam.exam_code,
+            grade=selected_exam.grade,
+            subject_name=final_subject_name,
+            defaults={
+                'max_score': 100,
+                'date_taken': selected_exam.date_taken,
+                'created_by': request.user,
+                'is_final': True
+            }
+        )
+    else:
+        final_exam = selected_exam
+
+    # ✅ Fetch exams & learners once
+    exams = list(
+        Exam.objects.filter(
+            exam_code=final_exam.exam_code,
+            grade=final_exam.grade,
+            is_final=False
+        ).select_related("subject")
+    )
+    students = list(Learner.objects.filter(grade=selected_exam.grade))
+
+    # ✅ Fetch all marks at once
+    all_marks = Mark.objects.filter(
+        student__in=students,
+        exam__in=exams if formula else [selected_exam]
+    )
+
+    # ✅ Build fast lookup
+    mark_dict = {(m.student_id, m.exam_id): m.score for m in all_marks}
+
+    marks_to_update = []
+    # return
+
+    for student in students:
+        score = 0
+        if formula:
+            variables = {exam.subject.name: mark_dict.get((student.id, exam.id), 0)
+                         for exam in exams}
+            try:
+                score = safe_eval(formula, variables)
+            except Exception:
+                score = 0
+        else:
+            score = mark_dict.get((student.id, selected_exam.id), 0)
+
+        # Bulk update if final paper
+        if final_subject_name:
+            marks_to_update.append(Mark(student=student, exam=final_exam, score=float(score)))
+
+        total_score += score
+        learners += 1
+        results.append({'student': student, 'score': int(round(score))})
+
+    with transaction.atomic():
+        if final_subject_name and marks_to_update:
+            Mark.objects.bulk_create(
+                marks_to_update,
+                update_conflicts=True,
+                update_fields=['score'],
+                unique_fields=['student', 'exam']
+            )
+
+    if learners > 0:
+        mean_score = round(total_score / learners, 2)
+
+    return render(request, 'subject_marklist.html', {
+        'results': results,
+        'selected_exam': final_exam if final_subject_name else selected_exam,
+        'total_score': int(total_score),
+        'learners': learners,
+        'mean_score': mean_score
+    })
+
+
+@login_required
+def class_marklist(request):
+    from .forms import ClassMarklistForm
+    form = ClassMarklistForm(request.POST or None)
+
+    if request.user.role == "admin":
+        exams = Exam.objects.all()
+    else:
+        exams = Exam.objects.filter(code__is_open=True)
+
+    if request.method == "POST" and form.is_valid():
+        data = form.cleaned_data.copy()
+        # Store only IDs in session
+        data['grade'] = data['grade'].id
+        request.session['class_form_data'] = data
+        return redirect('class_marklist_results')
+
+    return render(request, "class_marklist_select.html", {
+        "form": form,
+        "exams": exams
+    })
+
+
+@login_required
+def class_marklist_results(request):
+    """
+    Page 2: Show Class Marklist results
+    """
+    data = request.session.get('class_form_data')
+    if not data:
+        return redirect('class_marklist')
+
+    grade_id = data['grade']
+    exam_code = data['exam_code']
+
+    # Fetch objects
+    selected_grade = get_object_or_404(Grade, id=grade_id)
+    exams = (
+        Exam.objects.filter(grade=selected_grade, is_final=True)
+        .filter(models.Q(exam_code=exam_code) | models.Q(code__exam_code=exam_code))
+        .select_related("subject")
+        .order_by("subject__priority")
+    )
+    exams = list(exams)
+
+    subjects = [exam.subject.code for exam in exams]
+
+    # Initialize totals
+    subject_totals = {subject: 0 for subject in subjects}
+
+    students = list(Learner.objects.filter(grade=selected_grade))
+
+    # Fetch all marks once
+    all_marks = Mark.objects.filter(
+        student__in=students,
+        exam__in=exams
+    )
+
+    # Build fast lookup dictionary
+    mark_dict = {
+        (m.student_id, m.exam_id): int(m.score)
+        for m in all_marks
+    }
+    show_points = data.get('show_points_only', False)
+
+    results = []
+    for student in students:
+        student_data = {'student': student, 'scores': {}, 'total': 0}
+        total = 0
+        for exam in exams:
+            subject = exam.subject.code
+            score = mark_dict.get((student.id, exam.id), 0)
+            value = get_points(score) if show_points else score
+
+            student_data['scores'][subject] = value
+            total += value
+            subject_totals[subject] += score if not show_points else value
+
+        student_data['total'] = total
+        student_data['average'] = total / len(exams) if exams else 0
+        results.append(student_data)
+
+    # Compute means
+    num_students = len(students)
+    subject_means = {
+        subject: round(subject_totals[subject] / num_students, 2)
+        if num_students > 0 else 0
+        for subject in subjects
+    }
+
+    # Class stats
+    class_total = sum(r['total'] for r in results)
+    class_mean = round(class_total / len(results), 2) if results else 0
+
+    # Sort results by total descending
+    results.sort(key=lambda x: x['total'], reverse=True)
+
+    return render(request, 'class_marklist.html', {
+        'results': results,
+        'subjects': subjects,
+        'selected_grade': selected_grade,
+        'exam_code': exam_code,
+        'subject_totals': subject_totals,
+        'subject_means': subject_means,
+        'class_total': class_total,
+        'class_mean': class_mean,
+        'show_points': show_points
+    })
+
+
+@login_required
+def learner_performance(request, learner_id):
+    from students.models import Learner
+
+    learner = get_object_or_404(Learner, id=learner_id)
+
+    marks = (
+        Mark.objects.filter(student=learner)
+        .select_related("exam")
+    )
+
+    performance = {}
+
+    for mark in marks:
+        code = mark.exam.exam_code
+
+        if code not in performance:
+            performance[code] = {
+                "total": 0,
+                "count": 0,
+                "date_taken": mark.exam.date_taken,
+            }
+
+        performance[code]["total"] += mark.score
+        performance[code]["count"] += 1
+
+    progress_data = []
+
+    for code, data in performance.items():
+        avg = data["total"] / data["count"]
+
+        progress_data.append({
+            "exam_code": code,
+            "average": round(avg, 2),
+            "date_taken": data["date_taken"].isoformat(),
+        })
+
+    # Sort newest to oldest
+    progress_data = sorted(
+        progress_data,
+        key=lambda x: x["date_taken"],
+        reverse=False
+    )
+
+    return render(request, "learner_performance.html", {
+        "learner": learner,
+        "progress_data": progress_data,
+    })
+
+@login_required
+def get_exams_by_grade(request):
+    grade_id = request.GET.get('grade_id')
+    exams = Exam.objects.filter(grade_id=grade_id)
+
+    data = [
+        {
+            'id': exam.id,
+            'name': str(exam)
+        }
+        for exam in exams
+    ]
+
+    return JsonResponse({'exams': data})
+
+
+@login_required
+def get_exam_codes(request):
+    grade_id = request.GET.get("grade")
+
+    codes = (
+        Exam.objects.filter(grade_id=grade_id)
+        .values_list("exam_code", flat=True)
+        .distinct()
+        .order_by("exam_code")
+    )
+
+    return JsonResponse(list(codes), safe=False)
+
+
+def get_points(score):
+    if score >= 90:
+        return 8
+    elif score >= 75:
+        return 7
+    elif score >= 58:
+        return 6
+    elif score >= 41:
+        return 5
+    elif score >= 31:
+        return 4
+    elif score >= 21:
+        return 3
+    elif score >= 11:
+        return 2
+    else:
+        return 1
+
+
+ems/exams/utils.py
+----------------------------------------
+import ast
+import operator
+
+# Supported operators
+OPERATORS = {
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+    ast.Pow: operator.pow,
+}
+
+def safe_eval(expr, variables):
+    """
+    Safely evaluate a math expression using AST
+    """
+    def _eval(node):
+        if isinstance(node, ast.Num):  # number
+            return node.n
+
+        elif isinstance(node, ast.Name):  # variable
+            return variables.get(node.id, 0)
+
+        elif isinstance(node, ast.BinOp):  # x + y
+            left = _eval(node.left)
+            right = _eval(node.right)
+            return OPERATORS[type(node.op)](left, right)
+
+        elif isinstance(node, ast.UnaryOp):  # -x
+            return -_eval(node.operand)
+
+        else:
+            raise ValueError("Unsupported expression")
+
+    tree = ast.parse(expr, mode='eval')
+    return _eval(tree.body)
+
+
+ems/exams/admin.py
+----------------------------------------
+from django.contrib import admin
+from .models import Exam, ExamCode, Mark, Subject
+
+
+# Register your models here.
+admin.site.register(Exam)
+admin.site.register(ExamCode)
+admin.site.register(Subject)
+admin.site.register(Mark)
+
+
+ems/exams/__init__.py
+----------------------------------------
+
+
+ems/exams/views-legacy.py
+----------------------------------------
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from .forms import ExamForm, ExamCodeForm
+from .models import Exam, Mark,ExamCode
+from students.models import Learner, Grade
+from .utils import safe_eval
+import time
+from django.http import JsonResponse
+from django.db import transaction
+from django.db import models
+from django.contrib import messages
+
+
+@login_required
+def create_exam(request):
+    code = ExamCode.objects.filter(is_open=True)
+    if request.method == 'POST':
+        form = ExamForm(request.POST)
+        if form.is_valid():
+            exam = form.save(commit=False)
+            if int(exam.max_score) == int(100):
+                exam.is_final = True
+            exam.created_by = request.user
+            exam.save()
+            return redirect('enter_marks', exam_id=exam.id)
+        else:
+            messages.error(request, form.errors)
+            return render(request, 'create_exam.html', {'form': form})
+    else:
+        form = ExamForm()
+    return render(request, 'create_exam.html', {'form': form, 'code_present': code})
+
+
+@login_required
+def create_exam_code(request):
+    if request.method == 'POST':
+        form = ExamCodeForm(request.POST)
+        if form.is_valid():
+            exam = form.save(commit=False)
+            exam.created_by = request.user
+            exam.exam_code = request.POST.get('code')
+            exam.save()
+            return redirect('teacher_url')
+        else:
+            messages.error(request, form.errors)
+            return render(request, 'create_exam_code.html', {'form': form})
+    else:
+        form = ExamCodeForm()
+    return render(request, 'create_exam_code.html', {'form': form})
+
+
+@login_required
+def enter_marks(request, exam_id):
+    exam = get_object_or_404(Exam, id=exam_id)
+    students = Learner.objects.filter(grade=exam.grade).order_by('name')
+
+    # Fetch existing marks for this exam
+    existing_marks = {
+        mark.student_id: mark.score
+        for mark in Mark.objects.filter(exam=exam)
+    }
+
+    if request.method == 'POST':
+        for student in students:
+            score = request.POST.get(f'score_{student.id}')
+
+            if score:  # save only if value entered
+                Mark.objects.update_or_create(
+                    student=student,
+                    exam=exam,
+                    defaults={'score': float(score)}
+                )
+        messages.success(request, f'Exam {exam.subject_name} entered successfuly!')
+        return redirect('dashboard')
+
+    return render(request, 'enter_marks.html', {
+        'exam': exam,
+        'students': students,
+        'existing_marks': existing_marks  # 👈 pass this
+    })
+
+
+@login_required
+def subject_marklist_select(request):
+    from .forms import SubjectMarklistForm
+
+    form = SubjectMarklistForm(request.POST or None)
+
+    # ✅ Get unique grades sorted
+    grades = Grade.objects.all().order_by('name')
+
+    if request.method == "POST" and form.is_valid():
+        data = form.cleaned_data.copy()
+        data['exam'] = data['exam'].id
+        request.session['subject_form_data'] = data
+        return redirect('subject_marklist_results')
+
+    return render(request, "subject_marklist_select.html", {
+        "form": form,
+        "grades": grades  # 👈 IMPORTANT
+    })
+
+
+@login_required
+def subject_marklist_results(request):
+    # Get form data from session
+    data = request.session.get('subject_form_data')
+    if not data:
+        return redirect('subject_marklist')
+
+    final_subject_name = ""
+    results = []
+    selected_exam = None
+    total_score = 0
+    learners = 0
+    mean_score = 0
+
+    selected_exam_id = data['exam']
+    selected_exam = get_object_or_404(Exam, id=selected_exam_id)  # retrieve the object
+    formula = data.get('formula')
+    final_subject_name = data.get('paper_name', "")
+    print(formula)
+
+    # ✅ Create/Get final exam if a new paper name is given
+    if final_subject_name:
+        final_exam, _ = Exam.objects.get_or_create(
+            exam_code=selected_exam.exam_code,
+            grade=selected_exam.grade,
+            subject_name=final_subject_name,
+            defaults={
+                'max_score': 100,
+                'date_taken': selected_exam.date_taken,
+                'created_by': request.user,
+                'is_final': True
+            }
+        )
+    else:
+        final_exam = selected_exam
+
+    # ✅ Fetch exams & learners once
+    exams = list(Exam.objects.filter(
+        exam_code=final_exam.exam_code,
+        grade=final_exam.grade,
+        is_final=False
+    ))
+    print(exams)
+    students = list(Learner.objects.filter(grade=selected_exam.grade))
+
+    # ✅ Fetch all marks at once
+    all_marks = Mark.objects.filter(
+        student__in=students,
+        exam__in=exams if formula else [selected_exam]
+    )
+
+    # ✅ Build fast lookup
+    mark_dict = {(m.student_id, m.exam_id): m.score for m in all_marks}
+
+    marks_to_update = []
+    # return
+
+    for student in students:
+        score = 0
+        if formula:
+            variables = {exam.subject_name: mark_dict.get((student.id, exam.id), 0)
+                         for exam in exams}
+            try:
+                score = safe_eval(formula, variables)
+            except Exception:
+                score = 0
+        else:
+            score = mark_dict.get((student.id, selected_exam.id), 0)
+
+        # Bulk update if final paper
+        if final_subject_name:
+            marks_to_update.append(Mark(student=student, exam=final_exam, score=float(score)))
+
+        total_score += score
+        learners += 1
+        results.append({'student': student, 'score': int(round(score))})
+
+    with transaction.atomic():
+        if final_subject_name and marks_to_update:
+            Mark.objects.bulk_create(
+                marks_to_update,
+                update_conflicts=True,
+                update_fields=['score'],
+                unique_fields=['student', 'exam']
+            )
+
+    if learners > 0:
+        mean_score = round(total_score / learners, 2)
+
+    return render(request, 'subject_marklist.html', {
+        'results': results,
+        'selected_exam': final_exam if final_subject_name else selected_exam,
+        'total_score': int(total_score),
+        'learners': learners,
+        'mean_score': mean_score
+    })
+
+
+@login_required
+def class_marklist(request):
+    from .forms import ClassMarklistForm
+    form = ClassMarklistForm(request.POST or None)
+    exams = Exam.objects.filter(is_final=True)
+    #exams = exams.filter(code__is_open=True)
+
+    if request.method == "POST" and form.is_valid():
+        data = form.cleaned_data.copy()
+        # Store only IDs in session
+        data['grade'] = data['grade'].id
+        request.session['class_form_data'] = data
+        return redirect('class_marklist_results')
+
+    return render(request, "class_marklist_select.html", {
+        "form": form,
+        "exams": exams
+    })
+
+
+@login_required
+def class_marklist_results(request):
+    """
+    Page 2: Show Class Marklist results
+    """
+    data = request.session.get('class_form_data')
+    if not data:
+        return redirect('class_marklist')
+
+    grade_id = data['grade']
+    exam_code = data['exam_code']
+
+    # Fetch objects
+    selected_grade = get_object_or_404(Grade, id=grade_id)
+    exams = Exam.objects.filter(
+        grade=selected_grade,
+        is_final=True
+    )
+    exams = exams.filter(
+        models.Q(exam_code=code) | models.Q(code__exam_code=code)
+    )
+    exams = list(exams)
+
+    subjects = [exam.subject_name for exam in exams]
+
+    # Initialize totals
+    subject_totals = {subject: 0 for subject in subjects}
+
+    students = list(Learner.objects.filter(grade=selected_grade))
+
+    # Fetch all marks once
+    all_marks = Mark.objects.filter(
+        student__in=students,
+        exam__in=exams
+    )
+
+    # Build fast lookup dictionary
+    mark_dict = {
+        (m.student_id, m.exam_id): int(m.score)
+        for m in all_marks
+    }
+    show_points = data.get('show_points_only', False)
+
+    results = []
+    for student in students:
+        student_data = {'student': student, 'scores': {}, 'total': 0}
+        total = 0
+        for exam in exams:
+            subject = exam.subject_name
+            score = mark_dict.get((student.id, exam.id), 0)
+            value = get_points(score) if show_points else score
+
+            student_data['scores'][subject] = value
+            total += value
+            subject_totals[subject] += score if not show_points else value
+
+        student_data['total'] = total
+        student_data['average'] = total / len(exams) if exams else 0
+        results.append(student_data)
+
+    # Compute means
+    num_students = len(students)
+    subject_means = {
+        subject: round(subject_totals[subject] / num_students, 2)
+        if num_students > 0 else 0
+        for subject in subjects
+    }
+
+    # Class stats
+    class_total = sum(r['total'] for r in results)
+    class_mean = round(class_total / len(results), 2) if results else 0
+
+    # Sort results by total descending
+    results.sort(key=lambda x: x['total'], reverse=True)
+
+    return render(request, 'class_marklist.html', {
+        'results': results,
+        'subjects': subjects,
+        'selected_grade': selected_grade,
+        'exam_code': exam_code,
+        'subject_totals': subject_totals,
+        'subject_means': subject_means,
+        'class_total': class_total,
+        'class_mean': class_mean,
+        'show_points': show_points
+    })
+
+
+@login_required
+def learner_performance(request, learner_id):
+    from exams.models import Mark, Exam
+    from students.models import Learner
+    from django.db.models import Avg
+
+    learner = get_object_or_404(Learner, id=learner_id)
+
+    # Get all exams for this learner
+    marks = Mark.objects.filter(student=learner).select_related('exam')
+
+    # Group by exam_code (important for progress)
+    performance = {}
+
+    for mark in marks:
+        code = mark.exam.exam_code
+
+        if code not in performance:
+            performance[code] = {
+                'total': 0,
+                'count': 0
+            }
+
+        performance[code]['total'] += mark.score
+        performance[code]['count'] += 1
+
+    # Convert to list
+    progress_data = []
+    for code, data in performance.items():
+        avg = data['total'] / data['count']
+        progress_data.append({
+            'exam_code': code,
+            'average': round(avg, 2)
+        })
+
+    # Sort by exam_code (or date later)
+    progress_data = sorted(progress_data, key=lambda x: x['exam_code'])
+    progress_data.reverse()
+
+    return render(request, 'learner_performance.html', {
+        'learner': learner,
+        'progress_data': progress_data
+    })
+
+
+@login_required
+def get_exams_by_grade(request):
+    grade_id = request.GET.get('grade_id')
+
+    exams = Exam.objects.filter(grade_id=grade_id)
+
+    data = [
+        {
+            'id': exam.id,
+            'name': str(exam)
+        }
+        for exam in exams
+    ]
+
+    return JsonResponse({'exams': data})
+
+
+def get_points(score):
+    if score >= 90:
+        return 8
+    elif score >= 75:
+        return 7
+    elif score >= 58:
+        return 6
+    elif score >= 41:
+        return 5
+    elif score >= 31:
+        return 4
+    elif score >= 21:
+        return 3
+    elif score >= 11:
+        return 2
+    else:
+        return 1
+
+
+ems/exams/models.py
+----------------------------------------
+from django.db import models
+from students.models import Grade
+from django.conf import settings
+from students.models import Learner
+
+
+class ExamCode(models.Model):
+    exam_code = models.CharField(max_length=20)
+    date_taken = models.DateField(auto_now_add=True)
+    is_open = models.BooleanField(default=False)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return self.exam_code
+
+class Subject(models.Model):
+    code = models.CharField(max_length=10)
+    name = models.CharField(max_length=50)
+    priority = models.PositiveIntegerField()
+
+    class Meta:
+        ordering = ["priority"]
+        unique_together = ('code', 'name')
+
+    def __str__(self):
+        return f'{self.name} ({self.code})'
+
+class Exam(models.Model):
+    exam_code = models.CharField(max_length=20, null=True)  # old data
+    code = models.ForeignKey(ExamCode, on_delete=models.CASCADE, blank=True, null=True) #backward compatibility
+    grade = models.ForeignKey(Grade, on_delete=models.CASCADE)
+    subject_name = models.CharField(max_length=32)
+    subject = models.ForeignKey(Subject, on_delete=models.PROTECT, blank=True, null=True) # backward compatibility
+    max_score = models.FloatField(blank=True, null=True, default=100)
+    date_taken = models.DateField()
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    is_final = models.BooleanField(default=False)  # ✅ NEW
+    formula = models.TextField(blank=True, null=True)
+    depends_on = models.ManyToManyField("self", blank=True, symmetrical=False)
+
+    class Meta:
+        unique_together = ('exam_code', 'grade', 'subject')
+
+    @property
+    def resolved_exam_code(self):
+        return self.code.exam_code if self.code else self.exam_code
+
+    def save(self, *args, **kwargs):
+        if self.code:
+            self.exam_code = self.code.exam_code
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.exam_code} {self.grade} {self.subject_name} out of {int(self.max_score)}'
+
+
+class Mark(models.Model):
+    student = models.ForeignKey(Learner, on_delete=models.CASCADE)
+    exam = models.ForeignKey(Exam, on_delete=models.CASCADE)
+    score = models.FloatField()
+
+    class Meta:
+        unique_together = ('student', 'exam')  # Prevent double entries
+
+    def __str__(self):
+        return f"{self.student.name} - {self.exam.exam_code} : {self.score}"
+
+# TO DO
+#
+#
+#
+#
+# USE THIS INSTEAD OF exam_code in views once we have the resolved_exam_code for
+# BACKWARD COMPATIBILITY exam.resolved_exam_code
+#
+#
+#
+
+
+ems/exams/signal_state.py
+----------------------------------------
+import threading
+
+_signal_state = threading.local()
+_signal_state.active = True
+
+
+def signals_enabled():
+    return getattr(_signal_state, "active", True)
+
+
+def disable_signals():
+    _signal_state.active = False
+
+
+def enable_signals():
+    _signal_state.active = True
+
+
+ems/exams/services/recalculate.py
+----------------------------------------
+from django.db import transaction
+from exams.models import Mark
+from exams.utils import safe_eval
+from exams.signal_state import disable_signals, enable_signals
+
+
+def recalc_exam(final_exam):
+    raw_exams = list(final_exam.depends_on.all())
+    students = final_exam.grade.learner_set.all()
+
+    # no need to continue if no formula
+    if not final_exam.formula:
+        return
+
+    raw_marks = Mark.objects.filter(exam__in=raw_exams)
+
+    mark_dict = {
+        (m.student_id, m.exam_id): m.score
+        for m in raw_marks
+    }
+
+    new_marks = []
+
+    for student in students:
+        variables = {
+            ex.subject_name: mark_dict.get((student.id, ex.id), 0)
+            for ex in raw_exams
+        }
+
+        try:
+            score = safe_eval(final_exam.formula, variables)
+        except Exception:
+            score = 0
+
+        new_marks.append(
+            Mark(
+                student=student,
+                exam=final_exam,
+                score=score
+            )
+        )
+
+    with transaction.atomic():
+        # 🚨 prevent signal recursion during delete + recreate
+        disable_signals()
+
+        try:
+            Mark.objects.filter(exam=final_exam).delete()
+            Mark.objects.bulk_create(new_marks)
+        finally:
+            enable_signals()
+
+
+ems/exams/migrations/0005_exam_code.py
+----------------------------------------
+# Generated by Django 4.2 on 2026-05-04 10:51
+
+from django.db import migrations, models
+import django.db.models.deletion
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('exams', '0004_alter_exam_exam_code_alter_exam_is_final_examcode'),
+    ]
+
+    operations = [
+        migrations.AddField(
+            model_name='exam',
+            name='code',
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to='exams.examcode'),
+        ),
+    ]
+
+
+ems/exams/migrations/0011_alter_exam_unique_together.py
+----------------------------------------
+# Generated by Django 5.1.3 on 2026-07-17 05:34
+
+from django.db import migrations
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ("exams", "0010_alter_exam_max_score"),
+        ("students", "0003_grade_class_teacher"),
+    ]
+
+    operations = [
+        migrations.AlterUniqueTogether(
+            name="exam",
+            unique_together={("exam_code", "grade", "subject")},
+        ),
+    ]
+
+
+ems/exams/migrations/0002_alter_exam_exam_code_alter_exam_unique_together.py
+----------------------------------------
+# Generated by Django 4.2.3 on 2026-03-22 20:09
+
+from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+    dependencies = [
+        ("students", "0002_alter_learner_admission_number"),
+        ("exams", "0001_initial"),
+    ]
+
+    operations = [
+        migrations.AlterField(
+            model_name="exam",
+            name="exam_code",
+            field=models.CharField(max_length=20),
+        ),
+        migrations.AlterUniqueTogether(
+            name="exam",
+            unique_together={("exam_code", "grade", "subject_name")},
+        ),
+    ]
+
+
+ems/exams/migrations/0010_alter_exam_max_score.py
+----------------------------------------
+# Generated by Django 5.1.3 on 2026-07-17 05:29
+
+from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ("exams", "0009_alter_subject_code"),
+    ]
+
+    operations = [
+        migrations.AlterField(
+            model_name="exam",
+            name="max_score",
+            field=models.FloatField(blank=True, default=100, null=True),
+        ),
+    ]
+
+
+ems/exams/migrations/0009_alter_subject_code.py
+----------------------------------------
+# Generated by Django 5.1.3 on 2026-07-16 14:57
+
+from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ("exams", "0008_alter_subject_unique_together"),
+    ]
+
+    operations = [
+        migrations.AlterField(
+            model_name="subject",
+            name="code",
+            field=models.CharField(max_length=10),
+        ),
+    ]
+
+
+ems/exams/migrations/0003_exam_is_final.py
+----------------------------------------
+# Generated by Django 4.2.3 on 2026-03-23 13:55
+
+from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+    dependencies = [
+        ("exams", "0002_alter_exam_exam_code_alter_exam_unique_together"),
+    ]
+
+    operations = [
+        migrations.AddField(
+            model_name="exam",
+            name="is_final",
+            field=models.BooleanField(default=True),
+        ),
+    ]
+
+
+ems/exams/migrations/0004_alter_exam_exam_code_alter_exam_is_final_examcode.py
+----------------------------------------
+# Generated by Django 4.2 on 2026-05-04 10:42
+
+from django.conf import settings
+from django.db import migrations, models
+import django.db.models.deletion
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
+        ('exams', '0003_exam_is_final'),
+    ]
+
+    operations = [
+        migrations.AlterField(
+            model_name='exam',
+            name='exam_code',
+            field=models.CharField(max_length=20, null=True),
+        ),
+        migrations.AlterField(
+            model_name='exam',
+            name='is_final',
+            field=models.BooleanField(default=False),
+        ),
+        migrations.CreateModel(
+            name='ExamCode',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('exam_code', models.CharField(max_length=20)),
+                ('date_taken', models.DateField(auto_now_add=True)),
+                ('is_open', models.BooleanField(default=False)),
+                ('created_by', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
+            ],
+        ),
+    ]
+
+
+ems/exams/migrations/0001_initial.py
+----------------------------------------
+# Generated by Django 4.2.3 on 2026-03-22 14:02
+
+from django.conf import settings
+from django.db import migrations, models
+import django.db.models.deletion
+
+
+class Migration(migrations.Migration):
+    initial = True
+
+    dependencies = [
+        ("students", "0001_initial"),
+        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
+    ]
+
+    operations = [
+        migrations.CreateModel(
+            name="Exam",
+            fields=[
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("exam_code", models.CharField(max_length=20, unique=True)),
+                ("subject_name", models.CharField(max_length=32)),
+                ("max_score", models.FloatField()),
+                ("date_taken", models.DateField()),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "grade",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE, to="students.grade"
+                    ),
+                ),
+            ],
+        ),
+        migrations.CreateModel(
+            name="Mark",
+            fields=[
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("score", models.FloatField()),
+                (
+                    "exam",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE, to="exams.exam"
+                    ),
+                ),
+                (
+                    "student",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="students.learner",
+                    ),
+                ),
+            ],
+            options={
+                "unique_together": {("student", "exam")},
+            },
+        ),
+    ]
+
+
+ems/exams/migrations/0006_exam_depends_on_exam_formula.py
+----------------------------------------
+# Generated by Django 4.2.3 on 2026-05-05 01:44
+
+from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ("exams", "0005_exam_code"),
+    ]
+
+    operations = [
+        migrations.AddField(
+            model_name="exam",
+            name="depends_on",
+            field=models.ManyToManyField(blank=True, to="exams.exam"),
+        ),
+        migrations.AddField(
+            model_name="exam",
+            name="formula",
+            field=models.TextField(blank=True, null=True),
+        ),
+    ]
+
+
+ems/exams/migrations/0008_alter_subject_unique_together.py
+----------------------------------------
+# Generated by Django 5.1.3 on 2026-07-16 14:55
+
+from django.db import migrations
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ("exams", "0007_subject_exam_subject"),
+    ]
+
+    operations = [
+        migrations.AlterUniqueTogether(
+            name="subject",
+            unique_together={("code", "name")},
+        ),
+    ]
+
+
+ems/exams/migrations/__init__.py
+----------------------------------------
+
+
+ems/exams/migrations/0007_subject_exam_subject.py
+----------------------------------------
+# Generated by Django 5.1.3 on 2026-07-16 14:49
+
+import django.db.models.deletion
+from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ("exams", "0006_exam_depends_on_exam_formula"),
+    ]
+
+    operations = [
+        migrations.CreateModel(
+            name="Subject",
+            fields=[
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("code", models.CharField(max_length=10, unique=True)),
+                ("name", models.CharField(max_length=50)),
+                ("priority", models.PositiveIntegerField()),
+            ],
+            options={
+                "ordering": ["priority"],
+            },
+        ),
+        migrations.AddField(
+            model_name="exam",
+            name="subject",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.PROTECT,
+                to="exams.subject",
+            ),
+        ),
+    ]
+
+
+ems/exams/templatetags/custom_tags.py
+----------------------------------------
+from django import template
+
+register = template.Library()
+
+@register.filter
+def get_item(dictionary, key):
+    return dictionary.get(key)
+
+
