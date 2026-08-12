@@ -5,7 +5,7 @@
     <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
     <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
     {% if request.user.role == "admin" %}
-        <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
+        <a href="{% url 'exam_codes' %}" class="block p-2 rounded hover:bg-gray-100">Exam Codes</a>
     {% else %}
         <a href="{% url 'create_exam' %}" class="block p-2 text-blue-600 rounded hover:bg-gray-100">Create Exam</a>
     {% endif %}
@@ -18,7 +18,7 @@
     <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
     <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
     {% if request.user.role == "admin" %}
-        <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
+        <a href="{% url 'exam_codes' %}" class="block p-2 rounded hover:bg-gray-100">Exam Codes</a>
     {% else %}
         <a href="{% url 'create_exam' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam</a>
     {% endif %}
@@ -30,7 +30,6 @@
 <h2 class="text-xl font-semibold mb-6">Dashboard Overview</h2>
 
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-
     <div class="bg-white p-5 rounded-xl border shadow-sm">
         <p class="text-sm text-gray-500">Total Learners</p>
         <p class="text-2xl font-bold mt-2">{{ total_learners }}</p>
@@ -42,26 +41,8 @@
     </div>
 
     <div class="bg-white p-5 rounded-xl border shadow-sm">
-        <p class="text-sm text-green-500">Active Users</p>
-        <p class="text-2xl text-green-500 font-bold mt-2">{{ users_active }}</p>
+        <p class="text-sm text-gray-500">All Users</span></p>
+        <p class="text-2xl text-gray-500 font-bold mt-2">{{ users }}</p>
     </div>
-
-    <div class="bg-white p-5 rounded-xl border shadow-sm">
-        <p class="text-sm text-gray-500">All Users</p>
-        <p class="text-2xl font-bold mt-2">{{ users }}</p>
-    </div>
-
 </div>
-
-<div class="mt-6">
-    <a href="{% url 'add_learner' %}"
-        class="inline-block bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700">
-        Add Learner
-    </a>
-    <a href="{% url 'get_report_forms' %}"
-        class="inline-block bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700">
-        View Report Forms
-    </a>
-</div>
-
 {% endblock %}

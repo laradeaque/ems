@@ -1,21 +1,160 @@
 from .forms import ExamForm, ExamCodeForm, DoubleClassMarklistForm
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from students.models import Learner, Grade
+from .services.performance import get_learner_performance
+from .services.marklist import generate_subject_marklist
+from .services.marklist import generate_class_marklist
+from django.views.decorators.http import require_POST
+from .services.helpers import get_points, save_marks
 from .models import Exam, Mark, ExamCode, Subject
+from students.decorators import role_required
+from django.core.paginator import Paginator
+from students.models import Learner, Grade
+from .forms import SubjectMarklistForm
+from .forms import ClassMarklistForm
 from django.http import JsonResponse
 from django.contrib import messages
 from django.db import transaction
 from django.db import models
 from .utils import safe_eval
 
-@login_required
+
+# exam/views.py
+@role_required("admin")
+def exam_codes(request):
+    search_query = request.GET.get('q', '').strip()
+
+    # Query with optional search filter and latest ordering
+    codes = ExamCode.objects.all().order_by('-id')
+    if search_query:
+        codes = codes.filter(
+            Q(exam_code__icontains=search_query) |
+            Q(created_by__username__icontains=search_query)
+        )
+
+    # Paginate 10 items per page
+    paginator = Paginator(codes, 10)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'page_obj': page_obj,
+        'search_query': search_query,
+    }
+    return render(request, "exam_codes.html", context)
+
+
+@role_required("admin")
+def create_exam_code(request):
+    if request.method == "POST":
+        form = ExamCodeForm(request.POST)
+        if form.is_valid():
+            code = form.save(commit=False)
+            code.created_by = request.user
+            code.save()
+            messages.success(request, f"Exam Code '{code.exam_code}' created successfully.")
+            return redirect('exam_codes')
+    else:
+        form = ExamCodeForm()
+
+    return render(request, "create_exam_code.html", {
+        "form": form,
+        "edit_mode": False
+    })
+
+
+@role_required("admin")
+def edit_exam_code(request, pk):
+    code = get_object_or_404(ExamCode, pk=pk)
+    if request.method == "POST":
+        form = ExamCodeForm(request.POST, instance=code)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"Exam Code '{code}' updated successfully.")
+            return redirect('exam_codes')
+    else:
+        form = ExamCodeForm(instance=code)
+
+    return render(request, "create_exam_code.html", {
+        "form": form,
+        "edit_mode": True,
+        "code": code
+    })
+
+
+@role_required("admin")
+@require_POST
+def delete_exam_code(request, pk):
+    code = get_object_or_404(ExamCode, pk=pk)
+    code_name = code.exam_code
+    code.delete()
+    messages.success(request, f"Exam Code '{code_name}' was deleted successfully.")
+    return redirect('exam_codes')
+
+
+@role_required("admin")
+def learner_performance(request, learner_id):
+    learner = get_object_or_404(Learner, id=learner_id)
+
+    progress_data = get_learner_performance(learner)
+    return render(request, "learner_performance.html", {
+        "learner": learner,
+        "progress_data": progress_data
+    })
+
+
+@role_required("admin", "teacher")
+def get_exams_by_grade(request):
+    grade_id = request.GET.get('grade_id')
+    try: grade_id = int(grade_id)
+    except ValueError: return JsonResponse([], safe=True)
+
+    exams = Exam.objects.filter(grade_id=grade_id)
+    data = [{'id': exam.id, 'name': str(exam)} for exam in exams]
+    return JsonResponse({'exams': data})
+
+
+@role_required("admin", "teacher")
+def get_exam_codes(request):
+    grade_id = request.GET.get("grade")
+    try: grade_id = int(grade_id)
+    except ValueError: return JsonResponse([], safe=True)
+
+    codes = (
+        Exam.objects.filter(grade_id=grade_id)
+        .values_list("exam_code", flat=True)
+        .distinct()
+        .order_by("exam_code")
+    )
+
+    return JsonResponse(list(codes), safe=False)
+
+
+@role_required("admin", "teacher")
+def get_subjects(request):
+    grade_id = request.GET.get("grade")
+    try: grade_id = int(grade_id)
+    except ValueError: return JsonResponse({}, safe=True)
+
+    exam_code = request.GET.get("exam_code")
+
+    exams = Exam.objects.filter(
+        grade_id=grade_id, exam_code=exam_code
+        ).select_related("subject").order_by("subject__priority")
+
+    subjects = [
+        exam.subject.name if exam.subject else exam.subject_name
+        for exam in exams
+    ]
+    subjects = list(dict.fromkeys(subjects))
+
+    return JsonResponse(subjects, safe=False)
+
+
+@role_required("admin")
 def double_class_marklist(request):
     form = DoubleClassMarklistForm(request.POST or None)
-    if request.user.role == "admin":
-        exams = Exam.objects.all()
-    else:
-        exams = Exam.objects.filter(code__is_open=True)
+    exams = Exam.objects.all()
 
     if request.method == "POST" and form.is_valid():
         data = {
@@ -26,7 +165,6 @@ def double_class_marklist(request):
         }
 
         request.session["double_class_data"] = data
-
         return redirect("double_results")
 
     return render(request, "double_classlist.html", {
@@ -35,166 +173,16 @@ def double_class_marklist(request):
     })
 
 
-@login_required
-def double_class_results(request):
-    """
-    Page 2: Show Class Marklist results for two classes
-    """
-    data = request.session.get("double_class_data")
-    if not data:
-        return redirect("double")
-
-    first_grade = get_object_or_404(
-        Grade,
-        id=data["first_grade"]
-    )
-
-    second_grade = get_object_or_404(
-        Grade,
-        id=data["second_grade"]
-    )
-
-    exam_code = data["exam_code"]
-    show_points = data.get("show_points_only", False)
-
-    # Fetch exams for both classes
-    exams = Exam.objects.filter(
-        grade__in=[first_grade, second_grade],
-        is_final=True
-    ).filter(
-        models.Q(exam_code=exam_code) |
-        models.Q(code__exam_code=exam_code)
-    )
-
-    # Unique subjects for table columns
-    subjects = list(
-        exams.values_list(
-            "subject_name",
-            flat=True
-        ).distinct()
-    )
-    subjects = [
-        subject.code
-        for subject in Subject.objects.filter(exam__in=exams).distinct().order_by("priority")
-    ]
-
-    # All learners from both classes
-    learners = Learner.objects.filter(
-        grade__in=[first_grade, second_grade]
-    ).select_related("grade")
-
-    # Initialize totals
-    subject_totals = {subject: 0 for subject in subjects}
-
-    # Fetch all marks once
-    all_marks = Mark.objects.filter(
-        student__in=learners,
-        exam__in=exams
-    )
-
-    # Fast lookup for marks
-    mark_dict = {
-        (m.student_id, m.exam_id): int(m.score)
-        for m in all_marks
-    }
-
-    # Fast lookup for exams
-    exam_lookup = {
-        (exam.grade_id, exam.subject.code): exam.id
-        for exam in exams
-    }
-
-    results = []
-
-    for student in learners:
-        student_data = {
-            'student': student,
-            'scores': {},
-            'total': 0
-        }
-
-        total = 0
-
-        for subject in subjects:
-
-            # Get the correct exam for this student's class
-            exam_id = exam_lookup.get(
-                (student.grade_id, subject)
-            )
-
-            score = 0
-            if exam_id:
-                score = mark_dict.get(
-                    (student.id, exam_id),
-                    0
-                )
-
-            value = get_points(score) if show_points else score
-
-            student_data['scores'][subject] = value
-
-            total += value
-
-            subject_totals[subject] += (
-                value if show_points else score
-            )
-
-        student_data['total'] = total
-        student_data['average'] = (
-            total / len(subjects)
-            if subjects else 0
-        )
-
-        results.append(student_data)
-
-    # Compute means
-    num_students = len(learners)
-
-    subject_means = {
-        subject: round(
-            subject_totals[subject] / num_students,
-            2
-        ) if num_students > 0 else 0
-        for subject in subjects
-    }
-
-    # Class stats
-    class_total = sum(
-        r['total']
-        for r in results
-    )
-
-    class_mean = round(
-        class_total / len(results),
-        2
-    ) if results else 0
-
-    # Sort by total descending
-    results.sort(
-        key=lambda x: x['total'],
-        reverse=True
-    )
-
-    return render(request, 'class_marklist.html', {
-        'results': results,
-        'subjects': subjects,
-        'selected_grade': f"{first_grade.name} and {second_grade.name}",
-        'exam_code': exam_code,
-        'subject_totals': subject_totals,
-        'subject_means': subject_means,
-        'class_total': class_total,
-        'class_mean': class_mean,
-        'double': True,
-        'show_points': show_points
-    })
-
-@login_required
-def create_exam(request):
+@role_required("teacher")
+def create_exam_legacy(request):
+    '''
+    This is for teachers only admin is to manage only.
+    The marks must be out of 100
+    '''
     if request.method == 'POST':
         form = ExamForm(request.POST)
         if form.is_valid():
             exam = form.save(commit=False)
-            #if int(exam.max_score) == int(100):
             exam.is_final = True
 
             exam.created_by = request.user
@@ -221,185 +209,30 @@ def create_exam(request):
     return render(request, 'create_exam.html', {'form': form, 'code_present': code_present})
 
 
-@login_required
-def create_exam_code(request):
-    if request.method == 'POST':
-        form = ExamCodeForm(request.POST)
-        if form.is_valid():
-            exam = form.save(commit=False)
-            exam.created_by = request.user
-            exam.exam_code = request.POST.get('code')
-            exam.save()
-            return redirect('teacher_url')
-        else:
-            messages.error(request, form.errors)
-            return render(request, 'create_exam_code.html', {'form': form})
-    else:
-        form = ExamCodeForm()
-    return render(request, 'create_exam_code.html', {'form': form})
-
-
-@login_required
+@role_required("admin", "teacher")
 def enter_marks(request, exam_id):
     exam = get_object_or_404(Exam, id=exam_id)
-    students = Learner.objects.filter(grade=exam.grade).order_by('name')
+    students = (Learner.objects.filter(grade=exam.grade).order_by("name"))
 
-    # Fetch existing marks for this exam
-    existing_marks = {
-        mark.student_id: mark.score
-        for mark in Mark.objects.filter(exam=exam)
-    }
+    existing_marks = {m.student_id: m.score for m in Mark.objects.filter(exam=exam)    }
 
-    if request.method == 'POST':
-        for student in students:
-            score = request.POST.get(f'score_{student.id}')
+    if request.method=="POST":
+        _ = save_marks(exam, students, request.POST)
 
-            if score:  # save only if value entered
-                Mark.objects.update_or_create(
-                    student=student,
-                    exam=exam,
-                    defaults={'score': float(score)}
-                )
-        messages.success(request, f'Exam {exam.subject.name}({exam.grade}) entered successfully!')
-        return redirect('dashboard')
+        messages.success(request, "Marks saved successfully")
+        return redirect("dashboard")
 
-    return render(request, 'enter_marks.html', {
-        'exam': exam,
-        'students': students,
-        'existing_marks': existing_marks  # 👈 pass this
+    return render(request, "enter_marks.html", {
+        "exam": exam,
+        "students": students,
+        "existing_marks": existing_marks  # 👈 pass this
     })
 
 
-@login_required
-def subject_marklist_select(request):
-    from .forms import SubjectMarklistForm
-
-    form = SubjectMarklistForm(request.POST or None)
-
-    # ✅ Get unique grades sorted
-    grades = Grade.objects.all().order_by('name')
-
-    if request.method == "POST" and form.is_valid():
-        data = form.cleaned_data.copy()
-        data['exam'] = data['exam'].id
-        data['subject'] = data['subject'].id
-        request.session['subject_form_data'] = data
-        return redirect('subject_marklist_results')
-
-    return render(request, "subject_marklist_select.html", {
-        "form": form,
-        "grades": grades  # 👈 IMPORTANT
-    })
-
-
-@login_required
-def subject_marklist_results(request):
-    # Get form data from session
-    data = request.session.get('subject_form_data')
-    if not data:
-        return redirect('subject_marklist')
-
-    final_subject_name = ""
-    results = []
-    selected_exam = None
-    total_score = 0
-    learners = 0
-    mean_score = 0
-
-    selected_exam_id = data['exam']
-    selected_exam = get_object_or_404(Exam, id=selected_exam_id)  # retrieve the object
-    selected_subject = get_object_or_404(Subject, id=data["subject"])
-    formula = data.get('formula')
-    final_subject_name = data.get('paper_name', "")
-
-    # ✅ Create/Get final exam if a new paper name is given
-    if final_subject_name:
-        final_exam, _ = Exam.objects.get_or_create(
-            exam_code=selected_exam.exam_code,
-            grade=selected_exam.grade,
-            subject_name=final_subject_name,
-            defaults={
-                'max_score': 100,
-                'date_taken': selected_exam.date_taken,
-                'created_by': request.user,
-                'is_final': True
-            }
-        )
-    else:
-        final_exam = selected_exam
-
-    # ✅ Fetch exams & learners once
-    exams = list(
-        Exam.objects.filter(
-            exam_code=final_exam.exam_code,
-            grade=final_exam.grade,
-            is_final=False
-        ).select_related("subject")
-    )
-    students = list(Learner.objects.filter(grade=selected_exam.grade))
-
-    # ✅ Fetch all marks at once
-    all_marks = Mark.objects.filter(
-        student__in=students,
-        exam__in=exams if formula else [selected_exam]
-    )
-
-    # ✅ Build fast lookup
-    mark_dict = {(m.student_id, m.exam_id): m.score for m in all_marks}
-
-    marks_to_update = []
-    # return
-
-    for student in students:
-        score = 0
-        if formula:
-            variables = {exam.subject.name: mark_dict.get((student.id, exam.id), 0)
-                         for exam in exams}
-            try:
-                score = safe_eval(formula, variables)
-            except Exception:
-                score = 0
-        else:
-            score = mark_dict.get((student.id, selected_exam.id), 0)
-
-        # Bulk update if final paper
-        if final_subject_name:
-            marks_to_update.append(Mark(student=student, exam=final_exam, score=float(score)))
-
-        total_score += score
-        learners += 1
-        results.append({'student': student, 'score': int(round(score))})
-
-    with transaction.atomic():
-        if final_subject_name and marks_to_update:
-            Mark.objects.bulk_create(
-                marks_to_update,
-                update_conflicts=True,
-                update_fields=['score'],
-                unique_fields=['student', 'exam']
-            )
-
-    if learners > 0:
-        mean_score = round(total_score / learners, 2)
-
-    return render(request, 'subject_marklist.html', {
-        'results': results,
-        'selected_exam': final_exam if final_subject_name else selected_exam,
-        'total_score': int(total_score),
-        'learners': learners,
-        'mean_score': mean_score
-    })
-
-
-@login_required
+@role_required("admin")
 def class_marklist(request):
-    from .forms import ClassMarklistForm
     form = ClassMarklistForm(request.POST or None)
-
-    if request.user.role == "admin":
-        exams = Exam.objects.all()
-    else:
-        exams = Exam.objects.filter(code__is_open=True)
+    exams = Exam.objects.all()
 
     if request.method == "POST" and form.is_valid():
         data = form.cleaned_data.copy()
@@ -414,11 +247,8 @@ def class_marklist(request):
     })
 
 
-@login_required
+@role_required("admin")
 def class_marklist_results(request):
-    """
-    Page 2: Show Class Marklist results
-    """
     data = request.session.get('class_form_data')
     if not data:
         return redirect('class_marklist')
@@ -428,172 +258,181 @@ def class_marklist_results(request):
 
     # Fetch objects
     selected_grade = get_object_or_404(Grade, id=grade_id)
-    exams = (
-        Exam.objects.filter(grade=selected_grade, is_final=True)
-        .filter(models.Q(exam_code=exam_code) | models.Q(code__exam_code=exam_code))
-        .select_related("subject")
-        .order_by("subject__priority")
-    )
-    exams = list(exams)
+    show_points = data.get("show_points_only", False)
 
-    subjects = [exam.subject.code for exam in exams]
-
-    # Initialize totals
-    subject_totals = {subject: 0 for subject in subjects}
-
-    students = list(Learner.objects.filter(grade=selected_grade))
-
-    # Fetch all marks once
-    all_marks = Mark.objects.filter(
-        student__in=students,
-        exam__in=exams
-    )
-
-    # Build fast lookup dictionary
-    mark_dict = {
-        (m.student_id, m.exam_id): int(m.score)
-        for m in all_marks
-    }
-    show_points = data.get('show_points_only', False)
-
-    results = []
-    for student in students:
-        student_data = {'student': student, 'scores': {}, 'total': 0}
-        total = 0
-        for exam in exams:
-            subject = exam.subject.code
-            score = mark_dict.get((student.id, exam.id), 0)
-            value = get_points(score) if show_points else score
-
-            student_data['scores'][subject] = value
-            total += value
-            subject_totals[subject] += score if not show_points else value
-
-        student_data['total'] = total
-        student_data['average'] = total / len(exams) if exams else 0
-        results.append(student_data)
-
-    # Compute means
-    num_students = len(students)
-    subject_means = {
-        subject: round(subject_totals[subject] / num_students, 2)
-        if num_students > 0 else 0
-        for subject in subjects
-    }
-
-    # Class stats
-    class_total = sum(r['total'] for r in results)
-    class_mean = round(class_total / len(results), 2) if results else 0
-
-    # Sort results by total descending
-    results.sort(key=lambda x: x['total'], reverse=True)
-
-    return render(request, 'class_marklist.html', {
-        'results': results,
-        'subjects': subjects,
-        'selected_grade': selected_grade,
-        'exam_code': exam_code,
-        'subject_totals': subject_totals,
-        'subject_means': subject_means,
-        'class_total': class_total,
-        'class_mean': class_mean,
-        'show_points': show_points
+    context = generate_class_marklist(selected_grade, data["exam_code"], show_points)
+    return render(request, "class_marklist.html", {
+        **context,
+        "selected_grade": selected_grade,
+        "exam_code": data["exam_code"],
+        "show_points": show_points
     })
 
 
-@login_required
-def learner_performance(request, learner_id):
-    from students.models import Learner
+@role_required("admin")
+def subject_marklist_select(request):
+    form = SubjectMarklistForm(request.POST or None)
+    grades = Grade.objects.all().order_by('name')
 
-    learner = get_object_or_404(Learner, id=learner_id)
+    if request.method == "POST" and form.is_valid():
+        data = form.cleaned_data.copy()
+        data['grade'] = data["grade"].id
+        subject = data['subject']
+        print(subject)
+        data['exam'] = Exam.objects.filter(
+                            grade_id=data['grade'],
+                            exam_code=data['exam_code']
+                     ).filter(
+                         models.Q(subject__name=subject) |
+                         models.Q(subject_name=subject)
+                     ).first().id
+        request.session['subject_form_data'] = data
+        return redirect('subject_marklist_results')
 
-    marks = (
-        Mark.objects.filter(student=learner)
-        .select_related("exam")
-    )
-
-    performance = {}
-
-    for mark in marks:
-        code = mark.exam.exam_code
-
-        if code not in performance:
-            performance[code] = {
-                "total": 0,
-                "count": 0,
-                "date_taken": mark.exam.date_taken,
-            }
-
-        performance[code]["total"] += mark.score
-        performance[code]["count"] += 1
-
-    progress_data = []
-
-    for code, data in performance.items():
-        avg = data["total"] / data["count"]
-
-        progress_data.append({
-            "exam_code": code,
-            "average": round(avg, 2),
-            "date_taken": data["date_taken"].isoformat(),
-        })
-
-    # Sort newest to oldest
-    progress_data = sorted(
-        progress_data,
-        key=lambda x: x["date_taken"],
-        reverse=False
-    )
-
-    return render(request, "learner_performance.html", {
-        "learner": learner,
-        "progress_data": progress_data,
+    return render(request, "subject_marklist_select.html", {
+        "form": form,
+        "grades": grades  # 👈 IMPORTANT
     })
 
-@login_required
-def get_exams_by_grade(request):
-    grade_id = request.GET.get('grade_id')
-    exams = Exam.objects.filter(grade_id=grade_id)
 
-    data = [
-        {
-            'id': exam.id,
-            'name': str(exam)
-        }
-        for exam in exams
+@role_required("admin")
+def subject_marklist_results(request):
+    data = request.session.get('subject_form_data')
+    if not data:
+        return redirect('subject_marklist')
+
+    selected_exam = get_object_or_404(Exam, id=data['exam'])
+    result = generate_subject_marklist(
+        selected_exam=selected_exam,
+        formula=data.get('formula', ""),
+        final_subject_name=data.get('paper_name', ""),
+        created_by=request.user
+    )
+    # print(f"{result}")
+    # return JsonResponse("Good Boy", safe=False)
+
+    return render(request, 'subject_marklist.html', result)
+
+
+@role_required("admin")
+def double_class_results(request):
+    data = request.session.get("double_class_data")
+    if not data:
+        return redirect("double")
+
+    first_grade = get_object_or_404(Grade, id=data["first_grade"])
+    second_grade = get_object_or_404(Grade, id=data["second_grade"])
+    exam_code = data["exam_code"]
+    show_points = data.get("show_points_only", False)
+
+    result = generate_class_marklist(
+        grades=[first_grade, second_grade],
+        exam_code=exam_code,
+        show_points=show_points
+    )
+
+    return render(request, "class_marklist.html", {
+        **result,
+        "selected_grade": f"{first_grade.name} and {second_grade.name}",
+        "exam_code": exam_code,
+        "double": True,
+        "show_points": show_points
+    })
+
+
+@role_required("admin", "teacher")
+def get_available_subjects(request):
+    """
+    Returns only subjects that:
+    1. Belong to the requested Grade's Education Level (or apply to all levels).
+    2. Have NOT yet had an Exam created for this specific grade + exam code combination.
+    """
+    grade_id = request.GET.get("grade_id")
+    code_id = request.GET.get("code_id")
+
+    if not grade_id or not code_id:
+        return JsonResponse([], safe=False)
+
+    try:
+        grade_id = int(grade_id)
+        grade = Grade.objects.get(id=grade_id)
+    except (ValueError, Grade.DoesNotExist):
+        return JsonResponse([], safe=False)
+
+    # 1. Get subjects that already have an exam created for this grade and code
+    existing_exam_subject_ids = set(
+        Exam.objects.filter(
+            grade_id=grade_id
+        ).filter(
+            models.Q(code_id=code_id) | models.Q(exam_code=code_id) | models.Q(code__exam_code=code_id)
+        ).values_list("subject_id", flat=True)
+    )
+
+    existing_subject_names = set(
+        Exam.objects.filter(
+            grade_id=grade_id
+        ).filter(
+            models.Q(code_id=code_id) | models.Q(exam_code=code_id) | models.Q(code__exam_code=code_id)
+        ).values_list("subject_name", flat=True)
+    )
+
+    # 2. Filter subjects in Python (100% database-agnostic across SQLite, Postgres, and MySQL)
+    available_subjects = [
+        s for s in Subject.objects.all().order_by("priority")
+        if (not s.levels or grade.level in s.levels)
+        and s.id not in existing_exam_subject_ids
+        and s.code not in existing_subject_names
     ]
 
-    return JsonResponse({'exams': data})
+    data = [{'id': s.id, 'name': f"{s.name} ({s.code})"} for s in available_subjects]
+    return JsonResponse(data, safe=False)
 
 
-@login_required
-def get_exam_codes(request):
-    grade_id = request.GET.get("grade")
+@role_required("admin", "teacher")
+def create_exam(request):
+    if request.method == 'POST':
+        form = ExamForm(request.POST)
+        if form.is_valid():
+            exam = form.save(commit=False)
+            exam.is_final = True
+            exam.created_by = request.user
+            exam.subject_name = exam.subject.code
 
-    codes = (
-        Exam.objects.filter(grade_id=grade_id)
-        .values_list("exam_code", flat=True)
-        .distinct()
-        .order_by("exam_code")
-    )
+            existing_exam = Exam.objects.filter(
+                code=exam.code,
+                grade=exam.grade,
+                subject=exam.subject
+            ).first()
 
-    return JsonResponse(list(codes), safe=False)
-
-
-def get_points(score):
-    if score >= 90:
-        return 8
-    elif score >= 75:
-        return 7
-    elif score >= 58:
-        return 6
-    elif score >= 41:
-        return 5
-    elif score >= 31:
-        return 4
-    elif score >= 21:
-        return 3
-    elif score >= 11:
-        return 2
+            if existing_exam:
+                messages.info(request, "Exam already exists. Opening marks entry...")
+                return redirect('enter_marks', exam_id=existing_exam.id)
+            else:
+                exam.save()
+                messages.success(request, f"Exam for {exam.subject.name} created successfully!")
+                return redirect('enter_marks', exam_id=exam.id)
+        else:
+            messages.error(request, "Please correct the errors below.")
+            code_present = ExamCode.objects.filter(is_open=True).exists()
+            return render(request, 'create_exam.html', {'form': form, 'code_present': code_present})
     else:
-        return 1
+        form = ExamForm()
+        code_present = ExamCode.objects.filter(is_open=True).exists()
+    return render(request, 'create_exam.html', {'form': form, 'code_present': code_present})
+
+
+@role_required("admin")
+@require_POST
+def delete_exam(request, pk):
+    exam = get_object_or_404(Exam, pk=pk)
+    exam_info = f"{exam.resolved_exam_code} - {exam.grade.name} ({exam.subject_name})"
+
+    exam.delete()
+
+    messages.success(request, f"Exam '{exam_info}' was deleted successfully.")
+
+    # Redirect back to the same page with existing filters/pagination intact
+    referer = request.META.get('HTTP_REFERER')
+    if referer:
+        return redirect(referer)
+    return redirect('teacher_url')

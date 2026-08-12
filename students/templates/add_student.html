@@ -8,7 +8,7 @@
     {% endif %}
     <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
     {% if request.user.role == "admin" %}
-        <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
+        <a href="{% url 'exam_codes' %}" class="block p-2 rounded hover:bg-gray-100">Exam Code</a>
     <a href="{% url 'subject_marklist' %}" class="block p-2  rounded hover:bg-gray-100">Subject Marklist</a>
     <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
     {% else %}
@@ -24,7 +24,7 @@
     {% endif %}
     <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
     {% if request.user.role == "admin" %}
-        <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
+        <a href="{% url 'exam_codes' %}" class="block p-2 rounded hover:bg-gray-100">Exam Code</a>
     <a href="{% url 'subject_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Subject Marklist</a>
     <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
     {% else %}
@@ -35,46 +35,42 @@
 {% block content %}
 
 <div class="flex justify-center mt-10 px-4">
-  <div class="w-full max-w-md bg-white p-8 rounded-lg shadow">
+    <div class="w-full max-w-md bg-white p-8 rounded-lg shadow">
 
-    <h2 class="text-2xl font-semibold mb-6 text-center">Add Student</h2>
+        <h2 class="text-2xl font-semibold mb-6 text-center">
+            Edit Student
+        </h2>
 
-    <!-- FORM -->
-    <form method="post" class="space-y-4">
-      {% csrf_token %}
+        <form method="post" class="space-y-4">
+            {% csrf_token %}
 
-      <div>
-        <label class="block text-sm font-medium mb-1">Student Name</label>
-        <input type="text" name="name" placeholder="Student Name"
-               class="w-full p-2 border rounded focus:ring-2 focus:ring-green-500 focus:outline-none" required>
-      </div>
+            {% for field in form %}
+            <div>
+                <label class="block text-sm font-medium mb-1">
+                    {{ field.label }}
+                </label>
 
-      <div>
-        <label class="block text-sm font-medium mb-1">Admission Number</label>
-        <input type="text" name="admission_number"
-               value="{{ lid }}"
-               class="w-full p-2 border rounded focus:ring-2 focus:ring-green-500 focus:outline-none" required>
-      </div>
+                {{ field }}
 
-      <div>
-        <label class="block text-sm font-medium mb-1">Grade</label>
-        <select name="grade" required
-                class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:outline-none">
-          <option value="">Select Grade</option>
-          {% for grade in grades %}
-            <option value="{{ grade.id }}">{{ grade.name }}</option>
-          {% endfor %}
-        </select>
-      </div>
+                {% if field.errors %}
+                <p class="text-red-600 text-sm mt-1">
+                    {{ field.errors|join:", " }}
+                </p>
+                {% endif %}
+            </div>
+            {% endfor %}
 
-      <button type="submit"
-              class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition">
-        Add Student
-      </button>
-    </form>
+            <button
+                type="submit"
+                class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition">
+                Save Changes
+            </button>
 
-  </div>
+        </form>
+
+    </div>
 </div>
+
 
 <!-- Auto-dismiss messages -->
 <script>

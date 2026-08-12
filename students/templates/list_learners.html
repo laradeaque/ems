@@ -10,7 +10,7 @@
         <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
     {% endif %}
     {% if request.user.role == "admin" %}
-        <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
+        <a href="{% url 'exam_codes' %}" class="block p-2 rounded hover:bg-gray-100">Exam Code</a>
     <a href="{% url 'subject_marklist' %}" class="block p-2  rounded hover:bg-gray-100">Subject Marklist</a>
     <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
     {% else %}
@@ -28,7 +28,7 @@
         <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
     {% endif %}
     {% if request.user.role == "admin" %}
-        <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
+        <a href="{% url 'exam_codes' %}" class="block p-2 rounded hover:bg-gray-100">Exam Code</a>
     <a href="{% url 'subject_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Subject Marklist</a>
     <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
     {% else %}
@@ -96,7 +96,7 @@
                 <tr>
                     <th class="px-3 py-2 md:px-6 md:py-4 text-left text-xs font-medium text-gray-500 uppercase">#</th>
                     <th class="px-3 py-2 md:px-6 md:py-4 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                    <th class="hidden sm:table-cell px-3 py-2 md:px-6 md:py-4 text-left text-xs font-medium text-gray-500 uppercase">Admission</th>
+                    <th class="px-3 py-2 md:px-6 md:py-4 text-left text-xs font-medium text-gray-500 uppercase">Admission</th>
                     <th class="px-3 py-2 md:px-6 md:py-4 text-left text-xs font-medium text-gray-500 uppercase">Grade</th>
                     <th class="px-3 py-2 md:px-6 md:py-4 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
                 </tr>
@@ -106,14 +106,21 @@
                 {% for learner in page_obj %}
                 <tr class="hover:bg-gray-50">
                     <td class="px-3 py-2 md:px-6 md:py-4">{{ forloop.counter }}</td>
-                    <td class="px-3 py-2 md:px-6 md:py-4">{{ learner.name }}</td>
-                    <td class="hidden sm:table-cell px-3 py-2 md:px-6 md:py-4">{{ learner.admission_number }}</td>
-                    <td class="px-3 py-2 md:px-6 md:py-4">{{ learner.grade.name }}</td>
-                    <td class="px-3 py-2 md:px-6 md:py-4">
-                        <a href="{% url 'learner_performance' learner.id %}"
-                           class="text-blue-600 hover:underline">
-                            View
+                    <td class="px-3 py-2 md:px-6 md:py-4">{{ learner.name }}
+                        <a href="{% url 'edit_learner' learner.id %}"
+                        class="text-green-600 hover:underline" style="font-size:1rem">
+                            ✏️
                         </a>
+                    </td>
+                    <td class="px-3 py-2 md:px-6 md:py-4">{{ learner.admission_number }}</td>
+                    <td class="px-3 py-2 md:px-6 md:py-4">{{ learner.grade.name }}</td>
+                    <td class="px-3 py-2 md:px-6 md:py-4 space-x-3">
+                        <a href="{% url 'learner_performance' learner.id %}"
+                        class="text-blue-600 hover:underline">
+                            Performance
+                        </a>
+
+
                     </td>
                 </tr>
                 {% empty %}

@@ -8,7 +8,7 @@
     {% if request.user.role == "admin" %}
         <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
         <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
-        <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
+        <a href="{% url 'exam_codes' %}" class="block p-2 rounded hover:bg-gray-100">Exam Codes</a>
         <a href="{% url 'subject_marklist' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Subject Marklist</a>
         <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
     {% else %}
@@ -24,7 +24,7 @@
     {% if request.user.role == "admin" %}
         <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
         <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
-        <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
+        <a href="{% url 'exam_codes' %}" class="block p-2 rounded hover:bg-gray-100">Exam Codes</a>
         <a href="{% url 'subject_marklist' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Subject Marklist</a>
         <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
     {% else %}
@@ -34,45 +34,27 @@
 
 {% block content %}
 <div class="max-w-2xl mx-auto bg-white p-6 rounded-lg shadow">
-
     <h2 class="text-xl font-semibold mb-4">Generate Subject Marklist</h2>
 
     <form method="post" class="space-y-4">
         {% csrf_token %}
         <!-- GRADE SELECT -->
-        <div>
-            <label class="block text-sm font-medium mb-1">Grade</label>
-            <select id="gradeSelect" class="w-full border p-2 rounded">
-                <option value="">Select Grade</option>
-                {% for grade in grades %}
-                    <option value="{{ grade.id }}">
-                        {{ grade.name }}
-                    </option>
-                {% endfor %}
-            </select>
-        </div>
+        <div>{{ form.grade.label_tag }}{{ form.grade }}</div>
 
         <!-- EXAM SELECT -->
         <div>
-            <label class="block text-sm font-medium mb-1">{{ form.exam.label }}</label>
-            <select name="exam" id="examSelect" class="w-full border p-2 rounded">
+            <label class="block text-sm font-medium mb-1">Exam Code</label>
+            <select name="exam_code" id="examCodeSelect" class="w-full border p-2 rounded">
                 <option value="">Select Exam</option>
-                {% for exam in form.exam.field.queryset %}
-                    <option value="{{ exam.id }}" data-grade="{{ exam.grade.id }}">
-                        {{ exam.exam_code }} - {{ exam.subject.name }} ({{ exam.grade.name }})
-                    </option>
-                {% endfor %}
             </select>
         </div>
 
+        <!-- Subject SELECT -->
         <div>
-            <label class="block text-sm font-medium mb-1">{{ form.formula.label }}</label>
-            {{ form.formula }}
-        </div>
-
-        <div>
-            <label class="block text-sm font-medium mb-1">{{ form.paper_name.label }}</label>
-            {{ form.paper_name }}
+            <label class="block text-sm font-medium mb-1">Subject</label>
+            <select name="subject" id="subjectSelect" class="w-full border p-2 rounded">
+                <option value="">Select Subject</option>
+            </select>
         </div>
 
         <button type="submit"
@@ -84,26 +66,44 @@
 </div>
 
 <script>
-const gradeSelect = document.getElementById('gradeSelect');
-const examSelect = document.getElementById('examSelect');
+const gradeSelect = document.querySelector('[name="grade"]');
+const examSelect = document.getElementById("examCodeSelect");
+const subjectSelect = document.getElementById("subjectSelect");
 
 gradeSelect.addEventListener('change', function () {
-    const selectedGrade = this.value;
+    examSelect.innerHTML =
+        '<option value="">Loading...</option>';
 
-    Array.from(examSelect.options).forEach(option => {
-        if (!option.value) return; // skip placeholder
+    fetch(`/e/ajax/exam-codes/?grade=${this.value}`)
+        .then(response => response.json())
+        .then(data => {
 
-        const examGrade = option.getAttribute('data-grade');
+            examSelect.innerHTML =
+                '<option value="">Select Exam Code</option>';
 
-        if (examGrade === selectedGrade) {
-            option.style.display = 'block';
-        } else {
-            option.style.display = 'none';
-        }
-    });
+            data.forEach(code => {
+                examSelect.innerHTML +=
+                    `<option value="${code}">${code}</option>`;
+            });
 
-    examSelect.value = ""; // reset selection
+        });
+});
+
+examSelect.addEventListener('change', function () {
+    subjectSelect.innerHTML =
+        '<option value="">Loading...</option>';
+
+    fetch(`/e/ajax/subjects/?grade=${gradeSelect.value}&exam_code=${this.value}`)
+        .then(response => response.json())
+        .then(data => {
+            subjectSelect.innerHTML =
+                '<option value="">Select Subject</option>';
+            data.forEach(code => {
+                subjectSelect.innerHTML +=
+                    `<option value="${code}">${code}</option>`;
+            });
+
+        });
 });
 </script>
-
 {% endblock %}

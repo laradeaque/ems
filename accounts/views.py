@@ -103,8 +103,8 @@ def dashboard(request):
             'classes': classes
         })
     else:
-        return render(request, "updates.html")
-        #return teacher(request)
+        # return render(request, "updates.html")
+        return teacher(request)
 
 @login_required(login_url="/login/")
 def teacher(request):
@@ -140,7 +140,7 @@ def teacher(request):
     context = {
         'page_obj': page_obj,
         'grouped_exams': dict(grouped_exams),
-        'codes': ExamCode.objects.filter(is_open=True),
+        'codes': ExamCode.objects.all(),
         'grades': Grade.objects.all(),
         'filters': {
             'code': code or '',
@@ -150,3 +150,5 @@ def teacher(request):
     }
 
     return render(request, 'teacher.html', context)
+
+

@@ -4,11 +4,9 @@
     <a href="{% url 'dashboard' %}" class="block p-2 rounded hover:bg-gray-100">Dashboard</a>
     {% if request.user.role == "admin" %}
     <a href="{% url 'grade_list' %}" class="block p-2 rounded hover:bg-gray-100">Classes</a>
-    {% endif %}
-    {% if request.user.role == "admin" %}
     <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
         <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
-        <a href="{% url 'create_exam_code' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Create Exam Code</a>
+        <a href="{% url 'exam_codes' %}" class="block p-2 text-blue-600 rounded bg-gray-100 font-medium">Exam Codes</a>
         <a href="{% url 'subject_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Subject Marklist</a>
         <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
     {% else %}
@@ -21,10 +19,8 @@
     {% if request.user.role == "admin" %}
     <a href="{% url 'grade_list' %}" class="block p-2 rounded hover:bg-gray-100">Classes</a>
     <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
-    {% endif %}
-    {% if request.user.role == "admin" %}
         <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
-        <a href="{% url 'create_exam_code' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Create Exam Code</a>
+        <a href="{% url 'exam_codes' %}" class="block p-2 text-blue-600 rounded bg-gray-100 font-medium">Exam Codes</a>
         <a href="{% url 'subject_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Subject Marklist</a>
         <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
     {% else %}
@@ -33,29 +29,53 @@
 {% endblock %}
 
 {% block content %}
-<div class="max-w-3xl mx-auto bg-white p-6 rounded-lg shadow">
+<div class="max-w-2xl mx-auto bg-white p-6 rounded-lg shadow">
 
-    <h2 class="text-xl font-semibold mb-4">Create New Exam Code</h2>
+    <h2 class="text-xl font-semibold mb-6">
+        {% if edit_mode %}Edit Exam Code ({{ code.exam_code }}){% else %}Create New Exam Code{% endif %}
+    </h2>
 
     <form method="post" class="space-y-4">
         {% csrf_token %}
 
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.name.label }}</label>
+                {{ form.name }}
+                {% if form.name.errors %}<p class="text-red-500 text-xs mt-1">{{ form.name.errors.0 }}</p>{% endif %}
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.term.label }}</label>
+                {{ form.term }}
+                {% if form.term.errors %}<p class="text-red-500 text-xs mt-1">{{ form.term.errors.0 }}</p>{% endif %}
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.year.label }}</label>
+                {{ form.year }}
+                {% if form.year.errors %}<p class="text-red-500 text-xs mt-1">{{ form.year.errors.0 }}</p>{% endif %}
+            </div>
+        </div>
+
         <div>
-            <label class="block text-sm font-medium mb-1">{{ form.code.label }}</label>
-            {{ form.code }}
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.exam_code.label }}</label>
+            {{ form.exam_code }}
+            {% if form.exam_code.errors %}<p class="text-red-500 text-xs mt-1">{{ form.exam_code.errors.0 }}</p>{% endif %}
         </div>
 
-        <div class="flex gap-2 mt-2">
-            <label class="text-sm font-medium">{{ form.is_open.label }}</label>
+        <div class="flex items-center gap-2 pt-2">
             {{ form.is_open }}
+            <label for="{{ form.is_open.id_for_label }}" class="text-sm font-medium text-gray-700 cursor-pointer">
+                {{ form.is_open.label }}
+            </label>
         </div>
 
-
-        <div class="flex gap-2 mt-4">
-            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">
-                Create Exam Code
+        <div class="flex gap-3 pt-4 border-t">
+            <button type="submit" class="bg-blue-600 text-white px-5 py-2 rounded hover:bg-blue-700 transition font-medium">
+                {% if edit_mode %}Update Exam Code{% else %}Create Exam Code{% endif %}
             </button>
-            <a href="{% url 'dashboard' %}" class="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300 transition">
+            <a href="{% url 'exam_codes' %}" class="bg-gray-200 text-gray-700 px-5 py-2 rounded hover:bg-gray-300 transition">
                 Cancel
             </a>
         </div>

@@ -1,256 +1,307 @@
 {% extends "base_dashboard.html" %}
 {% load custom_tags %}
+
 {% block links %}
     <a href="{% url 'dashboard' %}" class="block p-2 rounded hover:bg-gray-100">Dashboard</a>
     {% if request.user.role == "admin" %}
-    <a href="{% url 'grade_list' %}" class="block p-2 rounded hover:bg-gray-100">Classes</a>
-    <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
-    {% endif %}
-    {% if request.user.role == "admin" %}
+        <a href="{% url 'grade_list' %}" class="block p-2 rounded hover:bg-gray-100">Classes</a>
+        <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
         <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
-        <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
-    {% else %}
-        <a href="{% url 'create_exam' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam</a>
-    {% endif %}
-
-    {% if request.user.role == "admin" %}
-        <a href="{% url 'subject_marklist' %}" class="block p-2  rounded hover:bg-gray-100">Subject Marklist</a>
-        <a href="{% url 'class_marklist' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Class Marklist</a>
-    {% endif %}
-{% endblock %}
-
-{% block minilinks %}
-    <a href="{% url 'dashboard' %}" class="block p-2 rounded hover:bg-gray-100">Dashboard</a>
-    {% if request.user.role == "admin" %}
-    <a href="{% url 'grade_list' %}" class="block p-2 rounded hover:bg-gray-100">Classes</a>
-    <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
-    {% endif %}
-    {% if request.user.role == "admin" %}
-        <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
-        <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
+        <a href="{% url 'exam_codes' %}" class="block p-2 rounded hover:bg-gray-100">Exam Codes</a>
         <a href="{% url 'subject_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Subject Marklist</a>
         <a href="{% url 'class_marklist' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Class Marklist</a>
     {% else %}
         <a href="{% url 'create_exam' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam</a>
     {% endif %}
 {% endblock %}
+
+{% block minilinks %}
+    <a href="{% url 'dashboard' %}" class="block p-2 rounded hover:bg-gray-100">Dashboard</a>
+    {% if request.user.role == "admin" %}
+        <a href="{% url 'grade_list' %}" class="block p-2 rounded hover:bg-gray-100">Classes</a>
+        <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
+        <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
+        <a href="{% url 'exam_codes' %}" class="block p-2 rounded hover:bg-gray-100">Exam Codes</a>
+        <a href="{% url 'subject_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Subject Marklist</a>
+        <a href="{% url 'class_marklist' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Class Marklist</a>
+    {% else %}
+        <a href="{% url 'create_exam' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam</a>
+    {% endif %}
+{% endblock %}
+
 {% block content %}
-<div class="overflow-x-auto mt-6">
-<!-- Print Button -->
-    <div class="flex justify-end mb-4">
-        <button onclick="printMarklist()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">
-            Print
+<style>
+    /* A4 LANDSCAPE PAGE CONFIGURATION */
+    @page {
+        size: A4 landscape;
+        margin: 8mm 10mm 10mm 10mm;
+
+        /* WeasyPrint / PDF Native Footer */
+        @bottom-right {
+            content: "✦✦✦ Designed and Developed by Ngaruiya Kamau";
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 10px;
+            color: #718096;
+            font-style: italic;
+        }
+    }
+
+    @media print {
+        /* FIX: Allow body to flow across multiple pages */
+        html, body {
+            height: auto !important;
+            overflow: visible !important;
+        }
+
+        /* Hide UI elements on print */
+        aside, header, nav, .no-print {
+            display: none !important;
+        }
+
+        body, main {
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+            background: white !important;
+        }
+
+        /* Dynamic page block configuration calibrated for A4 Landscape */
+        .print-page-block {
+            page-break-after: always !important;
+            break-after: page !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-height: 185mm; /* Flexible height for clean pagination without clipping */
+            padding-bottom: 2mm;
+        }
+
+        .print-page-block:last-child {
+            page-break-after: auto !important;
+            break-after: auto !important;
+        }
+
+        /* Table Sizing tuned for A4 Landscape */
+        table {
+            width: 100% !important;
+            border-collapse: collapse !important;
+            font-size: 10px !important;
+            table-layout: auto !important;
+        }
+
+        th, td {
+            padding: 2px 4px !important;
+            line-height: 1.15 !important;
+            border: 1px solid #94a3b8 !important;
+            text-align: center;
+        }
+
+        th {
+            background-color: #f1f5f9 !important;
+            font-weight: bold;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        .text-left {
+            text-align: left !important;
+        }
+
+        /* Browser Footer Attribution forced to bottom */
+        .print-attribution {
+            display: block !important;
+            text-align: right;
+            font-size: 9.5px;
+            color: #64748b;
+            font-style: italic;
+            font-family: Arial, Helvetica, sans-serif;
+            margin-top: auto; /* Pushes element strictly to flex container bottom */
+            padding-top: 4px;
+        }
+    }
+
+    .print-attribution {
+        display: none;
+    }
+</style>
+
+<div class="mt-4 px-2">
+    <!-- Controls Bar -->
+    <div class="flex justify-between items-center mb-4 no-print bg-white p-3 rounded shadow-sm border">
+        <div class="flex items-center gap-3">
+            <label class="text-sm font-medium text-gray-700">Learners per Page:</label>
+            <select id="learnersPerPage" class="border rounded px-2 py-1 text-sm bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                <option value="25">25 Learners</option>
+                <option value="30" selected>30 Learners (Recommended)</option><!--
+                <option value="35">35 Learners</option>-->
+            </select>
+        </div>
+
+        <button onclick="printMarklist()" class="bg-blue-600 text-white px-5 py-2 rounded font-medium hover:bg-blue-700 transition flex items-center gap-2 whitespace-nowrap shrink-0">
+            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+            Print Marklist
         </button>
     </div>
-    <center>
-        <h2 class="text-lg font-semibold mb-4">
-            Holy Rosary Primary and Junior School
-        </h2>
-        <h2 class="text-lg font-semibold mb-4">
-            {% if double %}
-                <p editable=true>{{ exam_code }} {{ selected_grade }}</p>
-            {% else %}
-                <p editable=true>{{ exam_code }} {{ selected_grade.name }}</p>
-            {% endif %}
-        </h2>
-    </center>
-    <div class="overflow-x-auto">
-        <table class="min-w-full bg-white border border-gray-300">
-            <thead class="bg-gray-100">
-                <tr>
-                    <th class="px-3 py-2 border">#</th>
-                    <th class="px-3 py-2 border text-left">Student</th>
-                    {% for subject in subjects %}
-                        <th class="px-3 py-2 border">{{ subject }}</th>
-                    {% endfor %}
-                    <th class="px-3 py-2 border">Total</th>
-                    {% if show_points %}
-                        <th class="px-3 py-2 border">Average</th>
-                    {% endif %}
-                </tr>
-            </thead>
 
-            <tbody>
-                {% for row in results %}
-                <tr class="text-center border-b">
-                    <td class="px-3 py-2">{{ forloop.counter }}</td>
-                    <td class="px-3 py-2 text-left">{{ row.student.name }}</td>
-                    {% for subject in subjects %}
-                        <td class="px-3 py-2">{{ row.scores|get_item:subject }}
-                        {% if not show_points %}
-                            ({% if row.scores|get_item:subject >= 90 %}EE1
-                            {% elif row.scores|get_item:subject >= 75 %}EE2
-                            {% elif row.scores|get_item:subject >= 58 %}ME1
-                            {% elif row.scores|get_item:subject >= 41 %}ME2
-                            {% elif row.scores|get_item:subject >= 31 %}AE1
-                            {% elif row.scores|get_item:subject >= 21 %}AE2
-                            {% elif row.scores|get_item:subject >= 11 %}BE1
+    <!-- Screen / Master Printable Wrapper -->
+    <div id="marklist-wrapper">
+        <div class="header-template text-center mb-2">
+            <h2 class="text-xl font-bold tracking-tight text-gray-800">
+                Holy Rosary Primary and Junior School
+            </h2>
+            <h3 class="text-base font-semibold text-gray-600">
+                {% if double %}
+                    <span editable="true">{{ exam_code }} {{ selected_grade }}</span>
+                {% else %}
+                    <span editable="true">{{ exam_code }} {{ selected_grade.name }}</span>
+                {% endif %}
+            </h3>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table id="marklistTable" class="min-w-full bg-white border border-gray-300">
+                <thead class="bg-gray-100">
+                    <tr>
+                        <th class="px-2 py-2 border w-10">#</th>
+                        <th class="px-3 py-2 border text-left">Student</th>
+                        {% for subject in subjects %}
+                            <th class="px-2 py-2 border">{{ subject }}</th>
+                        {% endfor %}
+                        <th class="px-2 py-2 border font-bold">Total</th>
+                        {% if show_points %}
+                            <th class="px-2 py-2 border font-bold">Average</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for row in results %}
+                    <tr class="text-center border-b hover:bg-gray-50">
+                        <td class="px-2 py-1.5">{{ forloop.counter }}</td>
+                        <td class="px-3 py-1.5 text-left font-medium">{{ row.student.name }}</td>
+                        {% for subject in subjects %}
+                            <td class="px-2 py-1.5">
+                                {{ row.scores|get_item:subject }}
+                                {% if not show_points %}
+                                    <span class="text-xs text-gray-500">
+                                    ({% if row.scores|get_item:subject >= 90 %}EE1
+                                    {% elif row.scores|get_item:subject >= 75 %}EE2
+                                    {% elif row.scores|get_item:subject >= 58 %}ME1
+                                    {% elif row.scores|get_item:subject >= 41 %}ME2
+                                    {% elif row.scores|get_item:subject >= 31 %}AE1
+                                    {% elif row.scores|get_item:subject >= 21 %}AE2
+                                    {% elif row.scores|get_item:subject >= 11 %}BE1
+                                    {% else %}BE2
+                                    {% endif %})
+                                    </span>
+                                {% endif %}
+                            </td>
+                        {% endfor %}
+                        <td class="px-2 py-1.5 font-bold text-gray-900">{{ row.total }}</td>
+                        {% if show_points %}
+                            <td class="px-2 py-1.5 font-bold">
+                            {% if row.average >= 7 %}EE1
+                            {% elif row.average >= 6 %}EE2
+                            {% elif row.average >= 5 %}ME1
+                            {% elif row.average >= 4 %}ME2
+                            {% elif row.average >= 3 %}AE1
+                            {% elif row.average >= 2 %}AE2
+                            {% elif row.average >= 1 %}BE1
                             {% else %}BE2
-                            {% endif %})
-                        {% endif %}</td>
+                            {% endif %}
+                            </td>
+                        {% endif %}
+                    </tr>
                     {% endfor %}
-                    <td class="px-3 py-2 font-semibold">{{ row.total }}</td>
-                    {% if show_points %}
-                        <td class="px-3 py-2 font-semibold">
-                        {% if row.average >= 7 %}EE1
-                        {% elif row.average >= 6 %}EE2
-                        {% elif row.average >= 5 %}ME1
-                        {% elif row.average >= 4 %}ME2
-                        {% elif row.average >= 3 %}AE1
-                        {% elif row.average >= 2 %}AE2
-                        {% elif row.average >= 1 %}BE1
-                        {% else %}BE2
-                        {% endif %}</td>
-                    {% endif %}
-                </tr>
-                {% endfor %}
-            </tbody>
+                </tbody>
 
-            <tfoot class="bg-gray-50 font-semibold">
-                <tr>
-                    <td colspan="2" class="px-3 py-2 text-left">Total</td>
-                    {% for subject in subjects %}
-                        <td class="px-3 py-2 text-center">{{ subject_totals|get_item:subject }}</td>
-                    {% endfor %}
-                    <td class="px-3 py-2 text-center">{{ class_total }}</td>
-                </tr>
+                <tfoot id="tableFooter" class="bg-gray-50 font-semibold border-t-2 border-gray-400">
+                    <tr>
+                        <td colspan="2" class="px-3 py-2 text-left font-bold">Total</td>
+                        {% for subject in subjects %}
+                            <td class="px-2 py-2 text-center">{{ subject_totals|get_item:subject }}</td>
+                        {% endfor %}
+                        <td class="px-2 py-2 text-center font-bold">{{ class_total }}</td>
+                        {% if show_points %}<td></td>{% endif %}
+                    </tr>
 
-                <tr>
-                    <td colspan="2" class="px-3 py-2 text-left">Mean</td>
-                    {% for subject in subjects %}
-                        <td class="px-3 py-2 text-center">{{ subject_means|get_item:subject }}</td>
-                    {% endfor %}
-                    <td class="px-3 py-2 text-center">{{ class_mean }}</td>
-                </tr>
-            </tfoot>
-        </table>
+                    <tr>
+                        <td colspan="2" class="px-3 py-2 text-left font-bold">Mean</td>
+                        {% for subject in subjects %}
+                            <td class="px-2 py-2 text-center">{{ subject_means|get_item:subject }}</td>
+                        {% endfor %}
+                        <td class="px-2 py-2 text-center font-bold">{{ class_mean }}</td>
+                        {% if show_points %}<td></td>{% endif %}
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
     </div>
 </div>
+
 <script>
-/*function printMarklist() {
-    // Reload page after printing
-    window.onafterprint = () => location.reload();
-
-    // Hide unnecessary elements
-    document.querySelector("aside")?.style.setProperty("display", "none", "important");
-    document.querySelector("header")?.style.setProperty("display", "none", "important");
-
-    document.querySelectorAll("button, a").forEach(el => {
-        el.style.setProperty("display", "none", "important");
-    });
-
-    // Remove page spacing
-    document.body.style.margin = "0";
-    document.body.style.padding = "0";
-
-    const main = document.querySelector("main");
-    if (main) {
-        main.style.margin = "0";
-        main.style.padding = "2px";
-        main.style.width = "100%";
-        main.style.fontSize = "9px";
-        main.style.lineHeight = "1";
-    }
-
-    // Remove extra wrapper spacing
-    document.querySelectorAll("main > div, .overflow-x-auto").forEach(div => {
-        div.style.margin = "0";
-        div.style.padding = "0";
-        div.style.width = "100%";
-    });
-
-    // Reduce heading sizes
-    document.querySelectorAll("h1, h2, h3, h4, p").forEach(el => {
-        el.style.margin = "2px 0";
-        el.style.padding = "0";
-        el.style.lineHeight = "1";
-    });
-
-    document.querySelectorAll("h2").forEach(el => {
-        el.style.fontSize = "11px";
-    });
-
-    // Compact the table
-    document.querySelectorAll("table").forEach(table => {
-        table.style.width = "100%";
-        table.style.tableLayout = "fixed";
-        table.style.borderCollapse = "collapse";
-        table.style.fontSize = "9px";
-    });
-
-    // Compact every cell
-    document.querySelectorAll("th, td").forEach(cell => {
-        cell.style.padding = "1px 2px";
-        cell.style.fontSize = "9px";
-        cell.style.lineHeight = "1";
-        cell.style.whiteSpace = "nowrap";
-        cell.style.verticalAlign = "middle";
-    });
-
-    // Make rows shorter
-    document.querySelectorAll("tr").forEach(row => {
-        row.style.height = "16px";
-    });
-
-    // Print
-    window.print();
-}*/
 function printMarklist() {
-    window.onafterprint = () => location.reload();
+    const originalWrapper = document.getElementById('marklist-wrapper');
+    const masterTable = document.getElementById('marklistTable');
+    const headerHTML = document.querySelector('.header-template').outerHTML;
+    const theadHTML = masterTable.querySelector('thead').outerHTML;
+    const tfootHTML = masterTable.querySelector('tfoot').outerHTML;
+    const allRows = Array.from(masterTable.querySelectorAll('tbody tr'));
 
-    // Hide unnecessary elements
-    document.querySelector("aside")?.style.setProperty("display", "none");
-    document.querySelector("header")?.style.setProperty("display", "none");
-    document.querySelectorAll("button, a").forEach(el => {
-        el.style.display = "none";
-    });
+    const chunkSize = parseInt(document.getElementById('learnersPerPage').value) || 30;
+    const totalPages = Math.ceil(allRows.length / chunkSize);
 
-    // Keep page almost full size
-    document.body.style.margin = "0";
-    document.body.style.padding = "0";
+    const printContainer = document.createElement('div');
+    printContainer.id = 'dynamic-print-container';
 
-    const main = document.querySelector("main");
-    if (main) {
-        main.style.padding = "0.25rem";
-        main.style.margin = "0";
-        main.style.fontSize = "0.8rem";      // 11.2px instead of 9px
-        main.style.width = "100%";
+    for (let i = 0; i < totalPages; i++) {
+        const pageBlock = document.createElement('div');
+        pageBlock.className = 'print-page-block';
+
+        const chunkRows = allRows.slice(i * chunkSize, (i + 1) * chunkSize);
+        const isLastPage = (i === totalPages - 1);
+
+        let rowsHTML = '';
+        chunkRows.forEach(row => {
+            rowsHTML += row.outerHTML;
+        });
+
+        pageBlock.innerHTML = `
+            <div>
+                ${headerHTML}
+                <table>
+                    ${theadHTML}
+                    <tbody>
+                        ${rowsHTML}
+                    </tbody>
+                    ${isLastPage ? tfootHTML : ''}
+                </table>
+            </div>
+            <div class="print-attribution">
+                Page ${i + 1} of ${totalPages} &nbsp;|&nbsp; ✦✦✦ Designed and Developed by Ngaruiya Kamau
+            </div>
+        `;
+
+        printContainer.appendChild(pageBlock);
     }
 
-    // Reduce wrapper spacing only a little
-    document.querySelectorAll(".overflow-x-auto").forEach(div => {
-        div.style.margin = "0";
-        div.style.padding = "0";
-    });
+    originalWrapper.style.display = 'none';
+    document.querySelector('.mt-4').appendChild(printContainer);
 
-    // Keep headings readable
-    document.querySelectorAll("h2").forEach(h => {
-        h.style.fontSize = "1rem";
-        h.style.margin = "0.2rem 0";
-    });
+    let reloaded = false;
+    const reloadPage = () => {
+        if (!reloaded) {
+            reloaded = true;
+            window.location.reload();
+        }
+    };
 
-    // Table uses full width
-    document.querySelectorAll("table").forEach(table => {
-        table.style.width = "100%";
-        table.style.borderCollapse = "collapse";
-        table.style.tableLayout = "auto"; // <-- don't use fixed
-        table.style.fontSize = "11px";
-    });
-
-    // Compact but not tiny
-    document.querySelectorAll("th, td").forEach(cell => {
-        cell.style.padding = "1.5px 3px";
-        cell.style.fontSize = "11px";
-        cell.style.lineHeight = "1.2";
-        cell.style.whiteSpace = "nowrap";
-    });
-
-    // Slightly shorter rows
-    document.querySelectorAll("tr").forEach(row => {
-        row.style.height = "18px";
-    });
-
+    window.onafterprint = reloadPage;
     window.print();
+    setTimeout(reloadPage, 500);
 }
 </script>
 {% endblock %}

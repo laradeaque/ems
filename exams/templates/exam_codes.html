@@ -1,0 +1,117 @@
+{% extends "base_dashboard.html" %}
+
+{% block links %}
+    <a href="{% url 'dashboard' %}" class="block p-2 rounded hover:bg-gray-100">Dashboard</a>
+    {% if request.user.role == 'admin' %}
+        <a href="{% url 'grade_list' %}" class="block p-2 rounded hover:bg-gray-100">Classes</a>
+        <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
+    {% endif %}
+    <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
+    {% if request.user.role == "admin" %}
+        <a href="{% url 'exam_codes' %}" class="block p-2 text-blue-600 bg-gray-100 rounded font-medium">Exam Codes</a>
+        <a href="{% url 'subject_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Subject Marklist</a>
+        <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
+    {% else %}
+        <a href="{% url 'create_exam' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam</a>
+    {% endif %}
+{% endblock %}
+
+{% block minilinks %}
+    <a href="{% url 'dashboard' %}" class="block p-2 rounded hover:bg-gray-100">Dashboard</a>
+    {% if request.user.role == 'admin' %}
+        <a href="{% url 'grade_list' %}" class="block p-2 rounded hover:bg-gray-100">Classes</a>
+        <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
+    {% endif %}
+    <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
+    {% if request.user.role == "admin" %}
+        <a href="{% url 'exam_codes' %}" class="block p-2 text-blue-600 bg-gray-100 rounded font-medium">Exam Codes</a>
+        <a href="{% url 'subject_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Subject Marklist</a>
+        <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
+    {% else %}
+        <a href="{% url 'create_exam' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam</a>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+
+<div class="mt-6">
+    <!-- HEADER -->
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-semibold">All Exam Codes</h2>
+
+        <a href="{% url 'create_exam_code' %}"
+        class="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition font-medium">
+            + Add Exam Code
+        </a>
+    </div>
+
+    <!-- TABLE -->
+    <div class="overflow-x-auto bg-white shadow rounded-lg">
+        <table class="min-w-[600px] w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-3 py-2 md:px-6 md:py-4 text-left text-xs font-medium text-gray-500 uppercase">#</th>
+                    <th class="px-3 py-2 md:px-6 md:py-4 text-left text-xs font-medium text-gray-500 uppercase">Exam Code</th>
+                    <th class="px-3 py-2 md:px-6 md:py-4 text-left text-xs font-medium text-gray-500 uppercase">Date Created</th>
+                    <th class="px-3 py-2 md:px-6 md:py-4 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th class="px-3 py-2 md:px-6 md:py-4 text-left text-xs font-medium text-gray-500 uppercase">Created By</th>
+                    <th class="px-3 py-2 md:px-6 md:py-4 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
+                </tr>
+            </thead>
+
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for code in page_obj %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-3 py-2 md:px-6 md:py-4 text-sm text-gray-500">{{ forloop.counter }}</td>
+                        <td class="px-3 py-2 md:px-6 md:py-4 font-semibold text-gray-800">{{ code.exam_code }}</td>
+                        <td class="px-3 py-2 md:px-6 md:py-4 text-sm text-gray-600">{{ code.date_taken }}</td>
+                        <td class="px-3 py-2 md:px-6 md:py-4 text-sm">
+                            {% if code.is_open %}
+                                <span class="px-2.5 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">Open</span>
+                            {% else %}
+                                <span class="px-2.5 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded-full">Closed</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-3 py-2 md:px-6 md:py-4 text-sm text-gray-600">{{ code.created_by.username|default:"N/A" }}</td>
+                        <td class="px-3 py-2 md:px-6 md:py-4 text-sm flex items-center space-x-3">
+                            <a href="{% url 'edit_exam_code' code.id %}"
+                            class="text-blue-600 hover:underline px-2">
+                                Edit
+                            </a>
+
+                            <form method="post" action="{% url 'delete_exam_code' code.id %}" class="inline" onsubmit="return confirm('Are you sure you want to delete exam code \'{{ code.exam_code }}\'?');">
+                                {% csrf_token %}
+                                <button type="submit" class="text-red-600 hover:underline cursor-pointer bg-transparent border-0 p-0 px-2">
+                                    Delete
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                            No exam codes found. Click "Add Exam Code" to create one.
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- PAGINATION -->
+        <div class="flex justify-center p-4 border-t space-x-2">
+            {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}" class="px-3 py-1 border text-blue-600 rounded hover:bg-gray-50">Prev</a>
+            {% endif %}
+
+            <span class="px-3 py-1 text-sm text-gray-600">
+                Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+            </span>
+
+            {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}" class="px-3 py-1 border text-blue-600 rounded hover:bg-gray-50">Next</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% endblock %}

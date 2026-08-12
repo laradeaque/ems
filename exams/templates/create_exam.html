@@ -3,8 +3,8 @@
 {% block links %}
     <a href="{% url 'dashboard' %}" class="block p-2 rounded hover:bg-gray-100">Dashboard</a>
     {% if request.user.role == "admin" %}
-    <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
-        <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
+        <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
+        <a href="{% url 'exam_codes' %}" class="block p-2 rounded hover:bg-gray-100">Exam Codes</a>
         <a href="{% url 'subject_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Subject Marklist</a>
         <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
     {% else %}
@@ -15,14 +15,15 @@
 {% block minilinks %}
     <a href="{% url 'dashboard' %}" class="block p-2 rounded hover:bg-gray-100">Dashboard</a>
     {% if request.user.role == "admin" %}
-    <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
-        <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
+        <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
+        <a href="{% url 'exam_codes' %}" class="block p-2 rounded hover:bg-gray-100">Exam Codes</a>
     {% else %}
         <a href="{% url 'create_exam' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Create Exam</a>
     {% endif %}
-    {% if request.user.role == "admin" %}    <a href="{% url 'subject_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Subject Marklist</a>
-    <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>{% endif %}
-
+    {% if request.user.role == "admin" %}
+        <a href="{% url 'subject_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Subject Marklist</a>
+        <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
+    {% endif %}
 {% endblock %}
 
 {% block content %}
@@ -30,12 +31,15 @@
     <h2 class="text-xl font-semibold mb-4">Create New Exam</h2>
     {% if code_present %}
 
-        <form method="post" class="space-y-4">
+        <!-- Status notice for missing or fully entered subjects -->
+        <div id="subject-status-notice" class="hidden mb-4 p-3 bg-blue-50 border border-blue-200 text-blue-800 rounded text-sm"></div>
+
+        <form method="post" id="exam-form" class="space-y-4">
             {% csrf_token %}
 
             <div>
                 <label class="block text-sm font-medium mb-1">{{ form.code.label }}</label>
-                {{ form.code}}
+                {{ form.code }}
             </div>
 
             <div>
@@ -48,23 +52,13 @@
                 {{ form.subject }}
             </div>
 
-            <!--<div>
-                <label class="block text-sm font-medium mb-1">{{ form.subject_name.label }}</label>
-                {{ form.subject_name }}
-            </div>-->
-
-            <!--<div>
-                <label class="block text-sm font-medium mb-1">{{ form.max_score.label }}</label>
-                {{ form.max_score }}
-            </div>-->
-
             <div>
                 <label class="block text-sm font-medium mb-1">{{ form.date_taken.label }}</label>
                 {{ form.date_taken }}
             </div>
 
             <div class="flex gap-2 mt-4">
-                <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">
+                <button type="submit" id="submit-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
                     Create Exam
                 </button>
                 <a href="{% url 'dashboard' %}" class="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300 transition">
@@ -77,6 +71,152 @@
             <p>Exam marks entry is currently closed. Please check back later.</p>
         </div>
     {% endif %}
-
 </div>
+
+<!-- Confirmation Modal -->
+<div id="confirm-modal" class="fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-center justify-center p-4 hidden transition-opacity duration-200">
+    <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 text-center sm:text-left transition-all transform">
+        <div class="flex flex-col sm:flex-row items-center gap-4">
+            <!-- Alert Warning Icon -->
+            <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-amber-100 sm:mx-0 sm:h-10 sm:w-10">
+                <svg class="h-6 w-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                </svg>
+            </div>
+            <div>
+                <h3 class="text-lg font-semibold text-gray-900">Confirm Exam Creation</h3>
+                <p class="text-sm text-gray-500 mt-1">Are you sure you want to create this exam? Please double-check the selected class and subject before confirming.</p>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="mt-6 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+            <button type="button" id="modal-cancel-btn" class="w-full sm:w-auto px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition text-sm">
+                Cancel
+            </button>
+            <button type="button" id="modal-confirm-btn" class="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition text-sm">
+                Yes, Create Exam
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const codeSelect = document.getElementById('id_code');
+    const gradeSelect = document.getElementById('id_grade');
+    const subjectSelect = document.getElementById('id_subject');
+    const submitBtn = document.getElementById('submit-btn');
+    const statusNotice = document.getElementById('subject-status-notice');
+    const examForm = document.getElementById('exam-form');
+
+    // Modal elements
+    const confirmModal = document.getElementById('confirm-modal');
+    const modalCancelBtn = document.getElementById('modal-cancel-btn');
+    const modalConfirmBtn = document.getElementById('modal-confirm-btn');
+
+    // 1. Fetch available subjects dynamic logic
+    function fetchAvailableSubjects() {
+        const codeId = codeSelect ? codeSelect.value : '';
+        const gradeId = gradeSelect ? gradeSelect.value : '';
+
+        if (!codeId || !gradeId) {
+            subjectSelect.innerHTML = '<option value="">-- Select Grade and Code First --</option>';
+            subjectSelect.disabled = true;
+            if (statusNotice) statusNotice.classList.add('hidden');
+            return;
+        }
+
+        subjectSelect.disabled = true;
+        subjectSelect.innerHTML = '<option value="">Loading pending subjects...</option>';
+
+        fetch(`{% url 'get_available_subjects' %}?grade_id=${gradeId}&code_id=${codeId}`)
+            .then(response => response.json())
+            .then(data => {
+                subjectSelect.innerHTML = '';
+
+                if (data.length === 0) {
+                    subjectSelect.innerHTML = '<option value="">-- All subjects entered --</option>';
+                    subjectSelect.disabled = true;
+                    if (submitBtn) submitBtn.disabled = true;
+                    if (statusNotice) {
+                        statusNotice.textContent = "All learning areas for this grade and exam code have already been created!";
+                        statusNotice.classList.remove('hidden');
+                    }
+                } else {
+                    subjectSelect.disabled = false;
+                    if (submitBtn) submitBtn.disabled = false;
+                    if (statusNotice) {
+                        statusNotice.textContent = `${data.length} learning area(s) pending for data entry.`;
+                        statusNotice.classList.remove('hidden');
+                    }
+
+                    const defaultOpt = document.createElement('option');
+                    defaultOpt.value = '';
+                    defaultOpt.textContent = '-- Select Subject --';
+                    subjectSelect.appendChild(defaultOpt);
+
+                    data.forEach(sub => {
+                        const opt = document.createElement('option');
+                        opt.value = sub.id;
+                        opt.textContent = sub.name;
+                        subjectSelect.appendChild(opt);
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching subjects:', error);
+                subjectSelect.innerHTML = '<option value="">Error loading subjects</option>';
+            });
+    }
+
+    if (codeSelect && gradeSelect) {
+        codeSelect.addEventListener('change', fetchAvailableSubjects);
+        gradeSelect.addEventListener('change', fetchAvailableSubjects);
+
+        if (codeSelect.value && gradeSelect.value) {
+            fetchAvailableSubjects();
+        }
+    }
+
+    // 2. Intercept form submission to display confirmation modal
+    if (examForm) {
+        examForm.addEventListener('submit', function(e) {
+            if (!examForm.dataset.confirmed) {
+                e.preventDefault();
+
+                // Trigger native browser validation if fields are missing
+                if (examForm.checkValidity()) {
+                    confirmModal.classList.remove('hidden');
+                } else {
+                    examForm.reportValidity();
+                }
+            }
+        });
+    }
+
+    // Modal action: Cancel
+    if (modalCancelBtn) {
+        modalCancelBtn.addEventListener('click', function() {
+            confirmModal.classList.add('hidden');
+        });
+    }
+
+    // Modal action: Confirm submission
+    if (modalConfirmBtn) {
+        modalConfirmBtn.addEventListener('click', function() {
+            examForm.dataset.confirmed = "true";
+            confirmModal.classList.add('hidden');
+            examForm.submit();
+        });
+    }
+
+    // Close modal on Escape key press
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && confirmModal && !confirmModal.classList.contains('hidden')) {
+            confirmModal.classList.add('hidden');
+        }
+    });
+});
+</script>
 {% endblock %}

@@ -1,0 +1,88 @@
+{% extends "base_dashboard.html" %}
+
+{% block links %}
+    <a href="{% url 'dashboard' %}" class="block p-2 rounded hover:bg-gray-100">Dashboard</a>
+    {% if request.user.role == 'admin' %}
+    <a href="{% url 'grade_list' %}" class="block p-2 rounded hover:bg-gray-100">Classes</a>
+    <a href="{% url 'learners_list' %}" class="block p-2 rounded text-blue-600 bg-gray-100">Learners</a>
+    {% endif %}
+    <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
+    {% if request.user.role == "admin" %}
+        <a href="{% url 'exam_codes' %}" class="block p-2 rounded hover:bg-gray-100">Exam Code</a>
+    <a href="{% url 'subject_marklist' %}" class="block p-2  rounded hover:bg-gray-100">Subject Marklist</a>
+    <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
+    {% else %}
+        <a href="{% url 'create_exam' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam</a>
+    {% endif %}
+{% endblock %}
+
+{% block minilinks %}
+    <a href="{% url 'dashboard' %}" class="block p-2 rounded hover:bg-gray-100">Dashboard</a>
+    {% if request.user.role == 'admin' %}
+    <a href="{% url 'grade_list' %}" class="block p-2 rounded hover:bg-gray-100">Classes</a>
+    <a href="{% url 'learners_list' %}" class="block p-2 rounded text-blue-600 bg-gray-100">Learners</a>
+    {% endif %}
+    <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
+    {% if request.user.role == "admin" %}
+        <a href="{% url 'exam_codes' %}" class="block p-2 rounded hover:bg-gray-100">Exam Code</a>
+    <a href="{% url 'subject_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Subject Marklist</a>
+    <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
+    {% else %}
+        <a href="{% url 'create_exam' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam</a>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+
+<div class="flex justify-center mt-10 px-4">
+    <div class="w-full max-w-md bg-white p-8 rounded-lg shadow">
+
+        <h2 class="text-2xl font-semibold mb-6 text-center">
+            Edit Student
+        </h2>
+
+        <form method="post" class="space-y-4">
+            {% csrf_token %}
+
+            {% for field in form %}
+            <div>
+                <label class="block text-sm font-medium mb-1">
+                    {{ field.label }}
+                </label>
+
+                {{ field }}
+
+                {% if field.errors %}
+                <p class="text-red-600 text-sm mt-1">
+                    {{ field.errors|join:", " }}
+                </p>
+                {% endif %}
+            </div>
+            {% endfor %}
+
+            <button
+                type="submit"
+                class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition">
+                Save Changes
+            </button>
+
+        </form>
+
+    </div>
+</div>
+
+
+<!-- Auto-dismiss messages -->
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const alerts = document.querySelectorAll(".alert");
+  alerts.forEach(alert => {
+    setTimeout(() => {
+      alert.classList.add("opacity-0", "transition", "duration-500");
+      setTimeout(() => alert.remove(), 500);
+    }, 4000);
+  });
+});
+</script>
+
+{% endblock %}

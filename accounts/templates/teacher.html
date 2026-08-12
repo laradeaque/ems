@@ -1,13 +1,13 @@
 {% extends "base_dashboard.html" %}
 {% block minilinks %}
-    <a href="{% url 'dashboard' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Dashboard</a>
+    <a href="{% url 'dashboard' %}" class="block p-2 rounded hover:bg-gray-100">Dashboard</a>
     {% if request.user.role == "admin" %}
     <a href="{% url 'grade_list' %}" class="block p-2 rounded hover:bg-gray-100">Classes</a>
     <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
     {% endif %}
     {% if request.user.role == "admin" %}
-        <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
-        <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
+        <a href="{% url 'teacher_url' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Exams</a>
+        <a href="{% url 'exam_codes' %}" class="block p-2 rounded hover:bg-gray-100">Exam Codes</a>
         <a href="{% url 'subject_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Subject Marklist</a>
         <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
     {% else %}
@@ -15,12 +15,12 @@
     {% endif %}
 {% endblock %}
 {% block links %}
-    <a href="{% url 'dashboard' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Dashboard</a>
+    <a href="{% url 'dashboard' %}" class="block p-2 rounded hover:bg-gray-100">Dashboard</a>
     {% if request.user.role == "admin" %}
     <a href="{% url 'grade_list' %}" class="block p-2 rounded hover:bg-gray-100">Classes</a>
     <a href="{% url 'learners_list' %}" class="block p-2 rounded hover:bg-gray-100">Learners</a>
-        <a href="{% url 'teacher_url' %}" class="block p-2 rounded hover:bg-gray-100">Exams</a>
-        <a href="{% url 'create_exam_code' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam Code</a>
+        <a href="{% url 'teacher_url' %}" class="block p-2 text-blue-600 rounded bg-gray-100">Exams</a>
+        <a href="{% url 'exam_codes' %}" class="block p-2 rounded hover:bg-gray-100">Exam Codes</a>
     {% else %}
         <a href="{% url 'create_exam' %}" class="block p-2 rounded hover:bg-gray-100">Create Exam</a>
     {% endif %}
@@ -29,16 +29,13 @@
         <a href="{% url 'class_marklist' %}" class="block p-2 rounded hover:bg-gray-100">Class Marklist</a>
     {% endif %}
 {% endblock %}
-{% block content %}
 
+{% block content %}
 <h2 class="text-lg font-semibold mb-4">Exams</h2>
 
 <!-- 🔍 FILTERS -->
 <div class="px-4 md:px-6">
     <form method="get" class="flex gap-2 mb-4">
-        <!--<input type="text" name="code" placeholder=""
-            value="{{ filters.code }}"
-            class="p-2 border rounded w-40">-->
         <select name="code" class="p-2 border rounded w-full">
             <option value="">Code</option>
             {% for c in codes %}
@@ -92,11 +89,19 @@
                         <td class="p-3">{{ exam.subject.code }}</td>
                         <td class="p-3">{{ exam.date_taken }}</td>
                         <td class="p-3">{{ exam.max_score }}</td>
-                        <td class="p-3">
-                            <a href="{% url 'enter_marks' exam.id %}"
-                            class="text-blue-600 hover:underline">
+                        <td class="p-3 flex items-center space-x-3 px-2">
+                            <a href="{% url 'enter_marks' exam.id %}" class="text-blue-600 hover:underline">
                                 Edit
                             </a>
+
+                            {% if request.user.role == "admin" %}
+                            <form method="post" action="{% url 'delete_exam' exam.id %}" class="inline" onsubmit="return confirm('Are you sure you want to delete this exam? All associated marks will also be removed.');">
+                                {% csrf_token %}
+                                <button type="submit" class="text-red-600 hover:underline cursor-pointer bg-transparent border-0 p-0 px-2" style="color:crimson">
+                                    Delete
+                                </button>
+                            </form>
+                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}

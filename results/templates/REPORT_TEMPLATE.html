@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Class Assessment Reports - {{ grade.name }}</title>
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 12mm 14mm 16mm 14mm;
+
+            /* WeasyPrint Native Bottom-Right Footer */
+            @bottom-right {
+                content: "✦✦✦ Designed and Developed by Ngaruiya Kamau";
+                font-family: Arial, Helvetica, sans-serif;
+                font-size: 11px;
+                color: #718096;
+                font-style: italic;
+            }
+        }
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 10.5pt;
+            color: #222;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Page break per learner for batch printing */
+        .report-page {
+            page-break-after: always;
+        }
+        .report-page:last-child {
+            page-break-after: avoid;
+        }
+
+        /* Header Section */
+        .header {
+            text-align: center;
+            border-bottom: 2.5px solid #1a365d;
+            padding-bottom: 8px;
+            margin-bottom: 14px;
+        }
+        .school-name {
+            font-size: 15pt;
+            font-weight: bold;
+            color: #1a365d;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .school-info {
+            font-size: 9.5pt;
+            color: #444;
+            margin-top: 2px;
+        }
+        .report-title {
+            font-size: 12pt;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-top: 6px;
+            background-color: #edf2f7;
+            padding: 4px 14px;
+            border-radius: 4px;
+            display: inline-block;
+            color: #1a365d;
+        }
+
+        /* Student Info Section */
+        .student-info {
+            width: 100%;
+            margin-bottom: 14px;
+            border-collapse: collapse;
+        }
+        .student-info td {
+            padding: 5px 0;
+            font-size: 10.5pt;
+        }
+        .student-info .label {
+            font-weight: bold;
+            color: #1a365d;
+        }
+
+        /* Main Marks Table */
+        table.report-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 14px;
+        }
+        table.report-table th, table.report-table td {
+            border: 1px solid #718096;
+            padding: 8px 10px;
+            text-align: center;
+            font-size: 10pt;
+        }
+        table.report-table th {
+            background-color: #2b6cb0;
+            color: white;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        table.report-table td.subject {
+            text-align: left;
+            font-weight: bold;
+            color: #2d3748;
+            width: 35%;
+        }
+        table.report-table tr.overall-row {
+            background-color: #e2e8f0;
+            font-weight: bold;
+            font-size: 10.5pt;
+        }
+
+        /* Chart Section - Expanded top & bottom margins */
+        .chart-box {
+            width: 100%;
+            text-align: center;
+            margin: 24px 0;
+        }
+        .chart-box img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        /* Signatures and Dates Section */
+        .footer-section {
+            margin-top: 16px;
+            font-size: 9.5pt;
+        }
+        .sig-table, .dates-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .sig-table td {
+            padding: 8px 0;
+            vertical-align: bottom;
+            font-weight: 500;
+        }
+        .dates-table td {
+            padding: 6px 0;
+            vertical-align: bottom;
+            font-weight: 500;
+        }
+        .line {
+            border-bottom: 1.5px solid #4a5568;
+            display: inline-block;
+            width: 160px;
+        }
+    </style>
+</head>
+<body>
+
+    {% for report in class_reports %}
+    <div class="report-page">
+        <div class="header">
+            <div class="school-name">HOLY ROSARY NURSERY PRIMARY & JUNIOR SCHOOL</div>
+            <div class="school-info">P.O.BOX 100 – 00900, KIAMBU | TEL: 0729661662</div>
+            <div class="report-title">Assessment Report</div>
+        </div>
+
+        <table class="student-info">
+            <tr>
+                <td><span class="label">Learner:</span> {{ report.values.NAME }}</td>
+                <td style="text-align: right;"><span class="label">Date:</span> {{ report.values.MONTH_DATE }}</td>
+            </tr>
+            <tr>
+                <td><span class="label">Grade:</span> {{ report.values.GRADE }}</td>
+                <td></td>
+            </tr>
+        </table>
+
+        <table class="report-table">
+            <thead>
+                <tr>
+                    <th class="subject">LEARNING AREA</th>
+                    {% for header in report.values.exam_headers %}
+                        <th>{{ header }}</th>
+                    {% endfor %}
+                    <th>Overall</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in report.values.subject_rows %}
+                <tr>
+                    <td class="subject">{{ row.name }}</td>
+                    {% for score in row.scores %}
+                        <td>{{ score }}</td>
+                    {% endfor %}
+                    <td>{{ row.overall }}</td>
+                </tr>
+                {% endfor %}
+                <tr class="overall-row">
+                    <td class="subject">OVERALL</td>
+                    {% for total in report.values.totals %}
+                        <td>{{ total }}</td>
+                    {% endfor %}
+                    <td>{{ report.values.overall_total }}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="chart-box">
+            {% if report.values.PROGRESS_CHART %}
+                <img src="{{ report.values.PROGRESS_CHART }}" alt="Progress Chart">
+            {% endif %}
+        </div>
+
+        <div class="footer-section">
+            <table class="sig-table">
+                <tr>
+                    <td>CLASS TEACHER'S SIGNATURE: <span class="line" style="width:200px;"></span></td>
+                    <td style="text-align: right;">DATE: <span class="line"></span></td>
+                </tr>
+                <tr>
+                    <td>HEAD TEACHER'S SIGNATURE: <span class="line" style="width:200px;"></span></td>
+                    <td style="text-align: right;">DATE: <span class="line"></span></td>
+                </tr>
+                <tr>
+                    <td>PARENT/GUARDIAN SIGNATURE: <span class="line" style="width:200px;"></span></td>
+                    <td style="text-align: right;">DATE: <span class="line"></span></td>
+                </tr>
+            </table>
+            <table class="dates-table" style="margin-top: 12px;">
+                <tr>
+                    <td>THIS TERM OPENING DATE: <span class="line" style="width: 120px;"></span></td>
+                    <td>CLOSING DATE: <span class="line" style="width: 120px;"></span></td>
+                </tr>
+                <tr>
+                    <td colspan="2" style="padding-top: 8px;">NEXT TERM BEGINS ON: <span class="line" style="width: 220px;"></span></td>
+                </tr>
+            </table>
+        </div>
+    </div>
+    {% endfor %}
+
+</body>
+</html>

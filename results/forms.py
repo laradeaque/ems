@@ -17,6 +17,7 @@ class ReportForm(forms.Form):
 
     midterm = forms.ModelChoiceField(
         queryset=ExamCode.objects.all(),
+        required=False,
         widget=forms.Select(attrs={"class": style})
     )
 
