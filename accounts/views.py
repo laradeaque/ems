@@ -103,8 +103,8 @@ def dashboard(request):
             'classes': classes
         })
     else:
-        return render(request, "updates.html")
-        #return teacher(request)
+        #return render(request, "updates.html")
+        return teacher(request)
 
 @login_required(login_url="/login/")
 def teacher(request):

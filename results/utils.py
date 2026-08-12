@@ -46,8 +46,8 @@ def get_placeholders(docx_path=""):
             for cell in row.cells:
                 extract(cell.text)
 
-    if "[PROGRESS_CHART]" in placeholders:
-        placeholders.remove("[PROGRESS_CHART]")
+    if "PROGRESS_CHART" in placeholders:
+        placeholders.remove("PROGRESS_CHART")
 
     return placeholders
 
@@ -127,7 +127,7 @@ def lookup(exam_codes, grade, placeholders):
     marks = list(marks)
 
     exam_dict = {
-        (exam.exam_code, exam.subject.code): exam.id
+        (exam.exam_code, exam.subject.code or exam.subject_name): exam.id
         for exam in exams
     }
     mark_dict = {
