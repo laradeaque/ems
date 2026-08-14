@@ -25,15 +25,51 @@ def format_mark(val):
         return val
 
 
+def get_rubric_info(score):
+    """
+    Evaluates CBC Rubric code and point weight (1 to 8 scale):
+    EE1 = 8, EE2 = 7, ME1 = 6, ME2 = 5, AE1 = 4, AE2 = 3, BE1 = 2, BE2 = 1
+    """
+    if score is None or score == "":
+        return "", 0
+    try:
+        val = float(score)
+    except (ValueError, TypeError):
+        return "", 0
+
+    if val >= 90:
+        return "EE1", 8
+    if val >= 75:
+        return "EE2", 7
+    if val >= 58:
+        return "ME1", 6
+    if val >= 41:
+        return "ME2", 5
+    if val >= 31:
+        return "AE1", 4
+    if val >= 21:
+        return "AE2", 3
+    if val >= 11:
+        return "BE1", 2
+    return "BE2", 1
+
+
+def format_mark_with_rubric(val):
+    """Formats score as 'Mark (Rubric)' e.g., '89 (EE1)' or '8 (BE2)'."""
+    formatted = format_mark(val)
+    if formatted == "":
+        return ""
+    code, _ = get_rubric_info(val)
+    return f"{formatted} ({code})" if code else str(formatted)
+
+
 def create_progress_chart(labels, scores):
     """Generates a base64 Data URI line chart using dynamic x-axis labels."""
-    # Ensure both arrays exist and match in length
     if not labels or not scores or len(labels) != len(scores):
         return ""
 
     numeric_scores = [0 if s in ("", None) else float(s) for s in scores]
 
-    # Don't draw a chart if the learner has 0 marks across all exams
     if all(s == 0 for s in numeric_scores):
         return ""
 
@@ -142,7 +178,9 @@ def lookup_class(grade):
             for code in exam_codes:
                 exam_id = exam_dict.get((code, subject.code))
                 raw_score = mark_dict.get((learner.id, exam_id), "") if exam_id else ""
-                scores.append(format_mark(raw_score))
+
+                scores.append(format_mark_with_rubric(raw_score))
+
                 if raw_score not in ("", None):
                     raw_scores.append(float(raw_score))
 
@@ -152,30 +190,43 @@ def lookup_class(grade):
                 "name": subject.name,
                 "code": subject.code,
                 "scores": scores,
-                "overall": format_mark(avg),
+                "raw_avg": avg,
+                "overall": format_mark_with_rubric(avg),
             })
 
         term_totals = []
         raw_term_totals = []
         for code in exam_codes:
-            total = 0
+            total_marks = 0
+            total_pts = 0
             has_marks = False
+
             for subject in subjects:
                 exam_id = exam_dict.get((code, subject.code))
                 if exam_id and (learner.id, exam_id) in mark_dict:
-                    total += float(mark_dict[(learner.id, exam_id)])
-                    has_marks = True
+                    raw_val = mark_dict[(learner.id, exam_id)]
+                    if raw_val not in ("", None):
+                        val = float(raw_val)
+                        total_marks += val
+                        _, pts = get_rubric_info(val)
+                        total_pts += pts
+                        has_marks = True
 
-            term_totals.append(format_mark(total) if has_marks else "")
-            # ALWAYS append to raw_term_totals to keep length aligned with exam_labels
-            raw_term_totals.append(total if has_marks else 0)
+            if has_marks:
+                term_totals.append(f"{format_mark(total_marks)} ({total_pts})")
+                raw_term_totals.append(total_marks)
+            else:
+                term_totals.append("")
+                raw_term_totals.append(0)
 
-        raw_valid_totals = [t for t in raw_term_totals if t > 0]
-        overall_avg = (
-            round(sum(raw_valid_totals) / len(raw_valid_totals), 2)
-            if raw_valid_totals
-            else ""
-        )
+        # Overall Average Marks & Points calculation across all subject averages
+        valid_subject_avgs = [s["raw_avg"] for s in subject_rows if s["raw_avg"] != ""]
+        if valid_subject_avgs:
+            overall_total_marks = sum(valid_subject_avgs)
+            overall_total_pts = sum(get_rubric_info(avg)[1] for avg in valid_subject_avgs)
+            formatted_overall_total = f"{format_mark(overall_total_marks)} ({overall_total_pts})"
+        else:
+            formatted_overall_total = ""
 
         report_data = {
             "NAME": learner.name,
@@ -184,7 +235,7 @@ def lookup_class(grade):
             "exam_headers": exam_labels,
             "subject_rows": subject_rows,
             "totals": term_totals,
-            "overall_total": format_mark(overall_avg),
+            "overall_total": formatted_overall_total,
             "PROGRESS_CHART": create_progress_chart(exam_labels, raw_term_totals),
         }
 
@@ -231,7 +282,9 @@ def lookup_learner(learner):
         for code in exam_codes:
             exam_id = exam_dict.get((code, subject.code))
             raw_score = mark_dict.get(exam_id, "") if exam_id else ""
-            scores.append(format_mark(raw_score))
+
+            scores.append(format_mark_with_rubric(raw_score))
+
             if raw_score not in ("", None):
                 raw_scores.append(float(raw_score))
 
@@ -241,30 +294,43 @@ def lookup_learner(learner):
             "name": subject.name,
             "code": subject.code,
             "scores": scores,
-            "overall": format_mark(avg),
+            "raw_avg": avg,
+            "overall": format_mark_with_rubric(avg),
         })
 
     term_totals = []
     raw_term_totals = []
     for code in exam_codes:
-        total = 0
+        total_marks = 0
+        total_pts = 0
         has_marks = False
+
         for subject in subjects:
             exam_id = exam_dict.get((code, subject.code))
             if exam_id and exam_id in mark_dict:
-                total += float(mark_dict[exam_id])
-                has_marks = True
+                raw_val = mark_dict[exam_id]
+                if raw_val not in ("", None):
+                    val = float(raw_val)
+                    total_marks += val
+                    _, pts = get_rubric_info(val)
+                    total_pts += pts
+                    has_marks = True
 
-        term_totals.append(format_mark(total) if has_marks else "")
-        # ALWAYS append to raw_term_totals to keep length aligned with exam_labels
-        raw_term_totals.append(total if has_marks else 0)
+        if has_marks:
+            term_totals.append(f"{format_mark(total_marks)} ({total_pts})")
+            raw_term_totals.append(total_marks)
+        else:
+            term_totals.append("")
+            raw_term_totals.append(0)
 
-    raw_valid_totals = [t for t in raw_term_totals if t > 0]
-    overall_avg = (
-        round(sum(raw_valid_totals) / len(raw_valid_totals), 2)
-        if raw_valid_totals
-        else ""
-    )
+    # Overall Average Marks & Points calculation across all subject averages
+    valid_subject_avgs = [s["raw_avg"] for s in subject_rows if s["raw_avg"] != ""]
+    if valid_subject_avgs:
+        overall_total_marks = sum(valid_subject_avgs)
+        overall_total_pts = sum(get_rubric_info(avg)[1] for avg in valid_subject_avgs)
+        formatted_overall_total = f"{format_mark(overall_total_marks)} ({overall_total_pts})"
+    else:
+        formatted_overall_total = ""
 
     return {
         "NAME": learner.name,
@@ -273,6 +339,6 @@ def lookup_learner(learner):
         "exam_headers": exam_labels,
         "subject_rows": subject_rows,
         "totals": term_totals,
-        "overall_total": format_mark(overall_avg),
+        "overall_total": formatted_overall_total,
         "PROGRESS_CHART": create_progress_chart(exam_labels, raw_term_totals),
     }

@@ -8,7 +8,6 @@
             size: A4 portrait;
             margin: 12mm 14mm 16mm 14mm;
 
-            /* WeasyPrint Native Bottom-Right Footer */
             @bottom-right {
                 content: "✦✦✦ Designed and Developed by Ngaruiya Kamau";
                 font-family: Arial, Helvetica, sans-serif;
@@ -25,7 +24,6 @@
             padding: 0;
         }
 
-        /* Page break per learner for batch printing */
         .report-page {
             page-break-after: always;
         }
@@ -33,7 +31,6 @@
             page-break-after: avoid;
         }
 
-        /* Header Section */
         .header {
             text-align: center;
             border-bottom: 2.5px solid #1a365d;
@@ -64,7 +61,6 @@
             color: #1a365d;
         }
 
-        /* Student Info Section */
         .student-info {
             width: 100%;
             margin-bottom: 14px;
@@ -79,17 +75,16 @@
             color: #1a365d;
         }
 
-        /* Main Marks Table */
         table.report-table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 14px;
+            margin-bottom: 10px;
         }
         table.report-table th, table.report-table td {
             border: 1px solid #718096;
-            padding: 8px 10px;
+            padding: 6px 8px;
             text-align: center;
-            font-size: 10pt;
+            font-size: 9.5pt;
         }
         table.report-table th {
             background-color: #2b6cb0;
@@ -107,14 +102,27 @@
         table.report-table tr.overall-row {
             background-color: #e2e8f0;
             font-weight: bold;
-            font-size: 10.5pt;
+            font-size: 10pt;
         }
 
-        /* Chart Section - Expanded top & bottom margins */
+        .rubric-legend {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 14px;
+            font-size: 7.5pt;
+            color: #4a5568;
+        }
+        .rubric-legend td {
+            border: 1px solid #cbd5e0;
+            padding: 3px 5px;
+            text-align: center;
+            background-color: #f7fafc;
+        }
+
         .chart-box {
             width: 100%;
             text-align: center;
-            margin: 24px 0;
+            margin: 16px 0;
         }
         .chart-box img {
             width: 100%;
@@ -122,9 +130,8 @@
             display: block;
         }
 
-        /* Signatures and Dates Section */
         .footer-section {
-            margin-top: 16px;
+            margin-top: 12px;
             font-size: 9.5pt;
         }
         .sig-table, .dates-table {
@@ -132,12 +139,12 @@
             border-collapse: collapse;
         }
         .sig-table td {
-            padding: 8px 0;
+            padding: 6px 0;
             vertical-align: bottom;
             font-weight: 500;
         }
         .dates-table td {
-            padding: 6px 0;
+            padding: 5px 0;
             vertical-align: bottom;
             font-weight: 500;
         }
@@ -190,13 +197,27 @@
                 </tr>
                 {% endfor %}
                 <tr class="overall-row">
-                    <td class="subject">OVERALL</td>
+                    <td class="subject">OVERALL TOTAL</td>
                     {% for total in report.values.totals %}
                         <td>{{ total }}</td>
                     {% endfor %}
                     <td>{{ report.values.overall_total }}</td>
                 </tr>
             </tbody>
+        </table>
+
+        <!-- Rubric Legend -->
+        <table class="rubric-legend">
+            <tr>
+                <td><b>EE1:</b> 90-100%</td>
+                <td><b>EE2:</b> 75-89%</td>
+                <td><b>ME1:</b> 58-74%</td>
+                <td><b>ME2:</b> 41-57%</td>
+                <td><b>AE1:</b> 31-40%</td>
+                <td><b>AE2:</b> 21-30%</td>
+                <td><b>BE1:</b> 11-20%</td>
+                <td><b>BE2:</b> 0-10%</td>
+            </tr>
         </table>
 
         <div class="chart-box">
@@ -220,13 +241,13 @@
                     <td style="text-align: right;">DATE: <span class="line"></span></td>
                 </tr>
             </table>
-            <table class="dates-table" style="margin-top: 12px;">
+            <table class="dates-table" style="margin-top: 8px;">
                 <tr>
-                    <td>THIS TERM OPENING DATE: <span class="line" style="width: 120px;"></span></td>
-                    <td>CLOSING DATE: <span class="line" style="width: 120px;"></span></td>
+                    <td>THIS TERM OPENING DATE: <span class="line" style="width: 200px;"></span></td>
+                    <td style="text-align: right;">CLOSING DATE: <span class="line" style="width: 160px;"></span></td>
                 </tr>
                 <tr>
-                    <td colspan="2" style="padding-top: 8px;">NEXT TERM BEGINS ON: <span class="line" style="width: 220px;"></span></td>
+                    <td colspan="2" style="padding-top: 6px;">NEXT TERM BEGINS ON: <span class="line" style="width: 220px;"></span></td>
                 </tr>
             </table>
         </div>
